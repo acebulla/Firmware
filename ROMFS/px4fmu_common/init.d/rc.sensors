@@ -9,6 +9,7 @@
 
 ms5611 start
 adc start
+# mb12xx start
 
 # mag might be external
 if hmc5883 start
