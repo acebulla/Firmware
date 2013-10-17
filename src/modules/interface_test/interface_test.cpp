@@ -38,42 +38,58 @@
  */
 
 #include <nuttx/config.h>
+#include <string.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
 
 #define MAX_ADDR_COUNT 127 /* Maximum number of different sensor addresses */
 #define GROUPEND 0x80 /* Bitmask indicating the end of an address group */
+#define ADDRPART 0x7F /* Bitmask for extracting the address part */
 
-__EXPORT int interface_test_main(int argc, char *argv[]);
+/*
+class INTERFACE_TEST
+{
+public:
+	interface_test_main(int bus, spi_dev_e device);
+}
+*/
+
+/** driver 'main' command */
+extern "C" { __EXPORT int interface_test_main(int argc, char *argv[]); }
+
 
 int interface_test_main(int argc, char *argv[])
 {
-	int i, addri, addrcount;
+	int i, addri = 0, addrcount = 0;
 	uint8_t * addr;
 
 	if (argc > 3 && (strcmp(argv[2], "-a") == 0 || strcmp(argv[2], "--addrgroups") == 0)) {
 		addrcount = atoi(argv[3]);
+		printf("addrcount: %d\n", addrcount);
 		if (addrcount <= MAX_ADDR_COUNT) {
 			addr = new uint8_t[addrcount];
 			for (i = 4; i < argc; i++) {
 				if (strcmp(argv[i], ",") == 0) {
-					addr[addri] |= GROUPEND;
+					addr[addri-1] |= GROUPEND;
+					printf("%X \n", addr[addri]);
 					continue;
 				}
 
 				addr[addri] = (uint8_t) atoi(argv[i]);
+				printf("addri: %d\t addr: %d \n", addri, addr[addri]);
 				addri++;
 			}
 
-			// Last address must be the end of a group in any case.
-			addr[addri] |= GROUPEND;
+			/* Last address must be the end of a group in any case. */
+			addr[addri-1] |= GROUPEND;
 		}
 	}
 
-	for (i = 1; i < addrcount; i++) {
-		printf("%d", (addr[i] | ~GROUPEND));
-		if (addr[i] | GROUPEND) {
+	for (i = 0; i < addrcount; i++) {
+		printf("%d", (addr[i] & ADDRPART));
+		if (addr[i] & GROUPEND) {
 			printf("\n");
 		}
 	}
