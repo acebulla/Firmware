@@ -62,7 +62,8 @@ extern "C" { __EXPORT int interface_test_main(int argc, char *argv[]); }
 
 int interface_test_main(int argc, char *argv[])
 {
-	int i, addri = 0, addrcount = 0;
+	int i;
+	uint8_t addri = 0, addrcount = 0;
 	uint8_t * addr;
 
 	if (argc > 3 && (strcmp(argv[2], "-a") == 0 || strcmp(argv[2], "--addrgroups") == 0)) {
@@ -73,7 +74,7 @@ int interface_test_main(int argc, char *argv[])
 			for (i = 4; i < argc; i++) {
 				if (strcmp(argv[i], ",") == 0) {
 					addr[addri-1] |= GROUPEND;
-					printf("%X \n", addr[addri]);
+					printf("%X \n", addr[addri-1]);
 					continue;
 				}
 
