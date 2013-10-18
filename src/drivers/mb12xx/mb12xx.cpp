@@ -63,7 +63,7 @@
 #include <systemlib/err.h>
 
 #include <drivers/drv_hrt.h>
-#include <drivers/drv_range_finder.h>
+#include <drivers/drv_range_finder_multsens.h>
 #include <drivers/device/ringbuffer.h>
 
 #include <uORB/uORB.h>
@@ -97,10 +97,13 @@ static const int ERROR = -1;
 # error This requires CONFIG_SCHED_WORKQUEUE.
 #endif
 
+/* Create topic metadate XXX move this to uORB\objects_common.cpp */
+ORB_DEFINE(multsens_range_finder, struct range_finder_multsens_report);
+
 class MB12XX : public device::I2C
 {
 public:
-	MB12XX(int bus = MB12XX_BUS, int address = MB12XX_BASEADDR);
+	MB12XX(int bus = MB12XX_BUS, uint8_t addresses[], uint8_t sensor_count);
 	virtual ~MB12XX();
 	
 	virtual int 		init();
@@ -117,11 +120,13 @@ protected:
 	virtual int			probe();
 
 private:
+	uint8_t				_addresses[];
 	float				_min_distance;
 	float				_max_distance;
 	work_s				_work;
 	RingBuffer		*_reports;
 	bool				_sensor_ok;
+	uint8_t				_sensor_count;
 	int					_measure_ticks;
 	bool				_collect_phase;
 	
@@ -186,12 +191,14 @@ private:
  */
 extern "C" __EXPORT int mb12xx_main(int argc, char *argv[]);
 
-MB12XX::MB12XX(int bus, int address) :
-	I2C("MB12xx", RANGE_FINDER_DEVICE_PATH, bus, address, 100000),
+MB12XX::MB12XX(int bus, uint8_t addresses[], uint8_t sensor_count) :
+	I2C("MB12xx", RANGE_FINDER_DEVICE_PATH, bus, 0, 100000),
+	_addresses(addresses),
 	_min_distance(MB12XX_MIN_DISTANCE),
 	_max_distance(MB12XX_MAX_DISTANCE),
 	_reports(nullptr),
 	_sensor_ok(false),
+	_sensor_count(sensor_count),
 	_measure_ticks(0),
 	_collect_phase(false),
 	_range_finder_topic(-1),
@@ -226,18 +233,18 @@ MB12XX::init()
 		goto out;
 
 	/* allocate basic report buffers */
-	_reports = new RingBuffer(2, sizeof(range_finder_report));
+	_reports = new RingBuffer(2, sizeof(range_finder_multsens_report));
 
 	if (_reports == nullptr)
 		goto out;
 
 	/* get a publish handle on the range finder topic */
-	struct range_finder_report zero_report;
+	struct range_finder_multsens_report zero_report;
 	memset(&zero_report, 0, sizeof(zero_report));
-	_range_finder_topic = orb_advertise(ORB_ID(sensor_range_finder), &zero_report);
+	_range_finder_topic = orb_advertise(ORB_ID(multsens_range_finder), &zero_report);
 
 	if (_range_finder_topic < 0)
-		debug("failed to create sensor_range_finder object. Did you start uOrb?");
+		debug("failed to create multsens_range_finder object. Did you start uOrb?");
 
 	ret = OK;
 	/* sensor is ok, but we don't really know if it is within range */
@@ -386,8 +393,8 @@ MB12XX::ioctl(struct file *filp, int cmd, unsigned long arg)
 ssize_t
 MB12XX::read(struct file *filp, char *buffer, size_t buflen)
 {
-	unsigned count = buflen / sizeof(struct range_finder_report);
-	struct range_finder_report *rbuf = reinterpret_cast<struct range_finder_report *>(buffer);
+	unsigned count = buflen / sizeof(struct range_finder_multsens_report);
+	struct range_finder_multsens_report *rbuf = reinterpret_cast<struct range_finder_multsens_report *>(buffer);
 	int ret = 0;
 
 	/* buffer must be large enough */
@@ -486,7 +493,7 @@ MB12XX::collect()
 	
 	uint16_t distance = val[0] << 8 | val[1];
 	float si_units = (distance * 1.0f)/ 100.0f; /* cm to m */
-	struct range_finder_report report;
+	struct range_finder_multsens_report report;
 
 	/* this should be fairly close to the end of the measurement, so the best approximation of the time */
 	report.timestamp = hrt_absolute_time();
@@ -494,7 +501,7 @@ MB12XX::collect()
 	report.valid = si_units > get_minimum_distance() && si_units < get_maximum_distance() ? 1 : 0;
 	
 	/* publish it */
-	orb_publish(ORB_ID(sensor_range_finder), _range_finder_topic, &report);
+	orb_publish(ORB_ID(multsens_range_finder), _range_finder_topic, &report);
 
 	if (_reports->force(&report)) {
 		perf_count(_buffer_overflows);
@@ -630,7 +637,7 @@ void	info();
  * Start the driver.
  */
 void
-start()
+start(uint8_t addresses[], uint8_t sensor_count)
 {
 	int fd;
 
@@ -638,7 +645,7 @@ start()
 		errx(1, "already started");
 
 	/* create the driver */
-	g_dev = new MB12XX(MB12XX_BUS);
+	g_dev = new MB12XX(MB12XX_BUS, addresses, sensor_count);
 
 	if (g_dev == nullptr)
 		goto fail;
@@ -693,7 +700,7 @@ void stop()
 void
 test()
 {
-	struct range_finder_report report;
+	struct range_finder_multsens_report report;
 	ssize_t sz;
 	int ret;
 
@@ -785,8 +792,42 @@ mb12xx_main(int argc, char *argv[])
 	/*
 	 * Start/load the driver.
 	 */
-	if (!strcmp(argv[1], "start"))
-		mb12xx::start();
+	if (!strcmp(argv[1], "start")) {
+		int i;
+		uint8_t addri = 0, addrcount = 0;
+		uint8_t * addr;
+
+		if (argc > 3 && (strcmp(argv[2], "-a") == 0 || strcmp(argv[2], "--addrgroups") == 0)) {
+			addrcount = atoi(argv[3]);
+			// printf("addrcount: %d\n", addrcount);
+			if (addrcount <= MAX_SENSOR_COUNT) {
+				addr = new uint8_t[addrcount];
+				for (i = 4; i < argc; i++) {
+					if (strcmp(argv[i], ",") == 0) {
+						addr[addri-1] |= GROUPEND;
+						printf("%X \n", addr[addri-1]);
+						continue;
+					}
+
+					addr[addri] = (uint8_t) atoi(argv[i]);
+					// printf("addri: %d\t addr: %d \n", addri, addr[addri]);
+					addri++;
+				}
+
+				/* Last address must be the end of a group in any case. */
+				addr[addri-1] |= GROUPEND;
+			}
+
+			mb12xx::start(addr, addrcount);
+			return OK;
+		}
+
+		addrcount = 1;
+		addr = new uint8_t[addrcount];
+		addr[0] = MB12XX_BASEADDR | GROUPEND;
+
+		mb12xx::start(addr, addrcount);
+	}
 	
 	 /*
 	  * Stop the driver
