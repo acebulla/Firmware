@@ -221,6 +221,9 @@ MB12XX::~MB12XX()
 	/* free any existing reports */
 	if (_reports != nullptr)
 		delete _reports;
+
+	/* free address array */
+	delete[] _addresses;
 }
 
 int
