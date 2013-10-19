@@ -67,6 +67,9 @@ int px4_simple_app_main(int argc, char *argv[])
 	int error_counter = 0;
 	
 	int i = 0;
+
+	/* obtained data for the first file descriptor */
+	struct range_finder_multsens_report raw;
  
 	while (i < 100) {
 		/* wait for sensor update of 1 file descriptor for 1000 ms (1 second) */
@@ -87,8 +90,7 @@ int px4_simple_app_main(int argc, char *argv[])
 		} else {
  
 			if (fds[0].revents & POLLIN) {
-				/* obtained data for the first file descriptor */
-				struct range_finder_multsens_report raw;
+
 				/* copy sensors raw data into local buffer */
 				orb_copy(ORB_ID(multsens_range_finder), sensor_sub_fd, &raw);
 				printf("[px4_simple_app] Range finder: Start: %d End: %d Valid: %u Distance:%8.4f m Timestamp: %u \n",
