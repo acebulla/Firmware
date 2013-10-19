@@ -58,7 +58,7 @@ struct range_finder_multsens_report {
 	uint64_t timestamp;
 	float distance [MAX_SENSOR_COUNT];	/** in meters */
 	uint8_t valid [MAX_SENSOR_COUNT];	/** 1 == within sensor range, 0 = outside sensor range */
-	uint8_t start_group, end_group;		/** Index of the first and the last sensor in the group */
+	uint8_t sensor_start, sensor_end;	/** Index of the first and the last sensor in the group */
 };
 
 /*

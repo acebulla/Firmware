@@ -44,7 +44,7 @@
 #include <poll.h>
 
 #include <uORB/uORB.h>
-#include <drivers/drv_range_finder.h>
+#include <drivers/drv_range_finder_multsens.h>
  
 __EXPORT int px4_simple_app_main(int argc, char *argv[]);
  
@@ -53,7 +53,7 @@ int px4_simple_app_main(int argc, char *argv[])
 	printf("Hello Sky!\n");
 	
 	/* subscribe to sensor_combined topic */
-	int sensor_sub_fd = orb_subscribe(ORB_ID(sensor_range_finder));
+	int sensor_sub_fd = orb_subscribe(ORB_ID(multsens_range_finder));
 	orb_set_interval(sensor_sub_fd, 500);
  
 	/* one could wait for multiple topics with this technique, just using one here */
@@ -88,12 +88,14 @@ int px4_simple_app_main(int argc, char *argv[])
  
 			if (fds[0].revents & POLLIN) {
 				/* obtained data for the first file descriptor */
-				struct range_finder_report raw;
+				struct range_finder_multsens_report raw;
 				/* copy sensors raw data into local buffer */
-				orb_copy(ORB_ID(sensor_range_finder), sensor_sub_fd, &raw);
-				printf("[px4_simple_app] Range finder: Valid: %u Distance:%8.4f m Timestamp: %u \n",
-					raw.valid,
-					raw.distance,
+				orb_copy(ORB_ID(multsens_range_finder), sensor_sub_fd, &raw);
+				printf("[px4_simple_app] Range finder: Start: %d End: %d Valid: %u Distance:%8.4f m Timestamp: %u \n",
+					raw.sensor_start,
+					raw.sensor_end,
+					raw.valid[raw.sensor_start],
+					raw.distance[raw.sensor_start],
 					raw.timestamp);
 			}
 			/* there could be more file descriptors here, in the form like:

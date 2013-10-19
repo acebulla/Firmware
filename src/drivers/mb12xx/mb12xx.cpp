@@ -103,7 +103,7 @@ ORB_DEFINE(multsens_range_finder, struct range_finder_multsens_report);
 class MB12XX : public device::I2C
 {
 public:
-	MB12XX(int bus = MB12XX_BUS, uint8_t addresses[], uint8_t sensor_count);
+	MB12XX(int bus, uint8_t addresses[], uint8_t sensor_count);
 	virtual ~MB12XX();
 	
 	virtual int 		init();
@@ -120,13 +120,15 @@ protected:
 	virtual int			probe();
 
 private:
-	uint8_t				_addresses[];
+	uint8_t				*_addresses;
 	float				_min_distance;
 	float				_max_distance;
 	work_s				_work;
 	RingBuffer		*_reports;
 	bool				_sensor_ok;
-	uint8_t				_sensor_count;
+	uint8_t				_sensor_count;	// How many addresses (sensors) were passed. Size of _addresses[].
+	uint8_t				_sensor_start;	// Number of the first sensor in the group.
+	uint8_t				_sensor_end;	// Number of the last sensor in the group.
 	int					_measure_ticks;
 	bool				_collect_phase;
 	
@@ -191,7 +193,7 @@ private:
  */
 extern "C" __EXPORT int mb12xx_main(int argc, char *argv[]);
 
-MB12XX::MB12XX(int bus, uint8_t addresses[], uint8_t sensor_count) :
+MB12XX::MB12XX(int bus, uint8_t *addresses, uint8_t sensor_count) :
 	I2C("MB12xx", RANGE_FINDER_DEVICE_PATH, bus, 0, 100000),
 	_addresses(addresses),
 	_min_distance(MB12XX_MIN_DISTANCE),
@@ -199,6 +201,8 @@ MB12XX::MB12XX(int bus, uint8_t addresses[], uint8_t sensor_count) :
 	_reports(nullptr),
 	_sensor_ok(false),
 	_sensor_count(sensor_count),
+	_sensor_start(0),
+	_sensor_end(0),
 	_measure_ticks(0),
 	_collect_phase(false),
 	_range_finder_topic(-1),
@@ -456,21 +460,44 @@ int
 MB12XX::measure()
 {
 	int ret;
+	uint8_t i;
 
-	/*
-	 * Send the command to begin a measurement.
-	 */
-	uint8_t cmd = MB12XX_TAKE_RANGE_REG;
-	ret = transfer(&cmd, 1, nullptr, 0);
+	for (i = _sensor_start; i < _sensor_count; i++) {
+		/*
+		 * Adjust the address to the current sensor.
+		 */
+		set_address(_addresses[i] & ADDRPART);
 
-	if (OK != ret)
+		/*
+		 * Send the command to begin a measurement.
+		 */
+		uint8_t cmd = MB12XX_TAKE_RANGE_REG;
+		ret = transfer(&cmd, 1, nullptr, 0);
+
+		if (OK != ret)
+		{
+			perf_count(_comms_errors);
+			log("i2c::transfer returned %d for sensor with address %X", ret, _addresses[i] & ADDRPART);
+			// XXX Maybe we want to continue if there is a problem with only one sensor
+			_sensor_end = i;
+			return ret;
+		}
+
+		if (_addresses[i] & GROUPEND) {
+			_sensor_end = i;
+			ret = OK;
+			break;
+		}
+
+	}
+
+	if (!(_addresses[i] & GROUPEND))
 	{
 		perf_count(_comms_errors);
-		log("i2c::transfer returned %d", ret);
-		return ret;
+		log("mb12xx::End of the final sensor group is not marked");
+		ret = -EPERM;
 	}
-	ret = OK;
-	
+
 	return ret;
 }
 
@@ -478,30 +505,45 @@ int
 MB12XX::collect()
 {
 	int	ret = -EIO;
+	uint8_t i;
+	struct range_finder_multsens_report report;
+
+	perf_begin(_sample_perf);
 	
 	/* read from the sensor */
 	uint8_t val[2] = {0, 0};
-	
-	perf_begin(_sample_perf);
-	
-	ret = transfer(nullptr, 0, &val[0], 2);
-	
-	if (ret < 0)
-	{
-		log("error reading from sensor: %d", ret);
-		perf_count(_comms_errors);
-		perf_end(_sample_perf);
-		return ret;
+	report.sensor_start = _sensor_start;
+	i = _sensor_start;
+
+	while (i <= _sensor_end) {
+		set_address(_addresses[i] & ADDRPART);
+
+		ret = transfer(nullptr, 0, &val[0], 2);
+
+		if (ret < 0)
+		{
+			log("error reading from sensor with address %X: %d", _addresses[i] & ADDRPART, ret);
+			perf_count(_comms_errors);
+			perf_end(_sample_perf);
+			return ret;
+		}
+
+		uint16_t distance = val[0] << 8 | val[1];
+		float si_units = (distance * 1.0f)/ 100.0f; /* cm to m */
+
+		report.distance[i] = si_units;
+		report.valid[i] = si_units > get_minimum_distance() && si_units < get_maximum_distance() ? 1 : 0;
+
+		i++;
 	}
 	
-	uint16_t distance = val[0] << 8 | val[1];
-	float si_units = (distance * 1.0f)/ 100.0f; /* cm to m */
-	struct range_finder_multsens_report report;
-
-	/* this should be fairly close to the end of the measurement, so the best approximation of the time */
+	report.sensor_end = i-1;
+	_sensor_start = (i < _sensor_count) ? i : 0;
+	
+	/* This should be fairly close to the end of the measurement, so the best approximation of the time.
+	 * We record the time after all sensors in the group have been measured.
+	 * */
 	report.timestamp = hrt_absolute_time();
-	report.distance = si_units;
-	report.valid = si_units > get_minimum_distance() && si_units < get_maximum_distance() ? 1 : 0;
 	
 	/* publish it */
 	orb_publish(ORB_ID(multsens_range_finder), _range_finder_topic, &report);
@@ -525,6 +567,8 @@ MB12XX::start()
 	/* reset the report ring and state machine */
 	_collect_phase = false;
 	_reports->flush();
+	_sensor_start = 0;
+	_sensor_end = 0;
 
 	/* schedule a cycle to start things */
 	work_queue(HPWORK, &_work, (worker_t)&MB12XX::cycle_trampoline, this, 1);
@@ -630,7 +674,7 @@ const int ERROR = -1;
 
 MB12XX	*g_dev;
 
-void	start();
+void	start(uint8_t addresses[], uint8_t sensor_count);
 void	stop();
 void	test();
 void	reset();
@@ -640,7 +684,7 @@ void	info();
  * Start the driver.
  */
 void
-start(uint8_t addresses[], uint8_t sensor_count)
+start(uint8_t *addresses, uint8_t sensor_count)
 {
 	int fd;
 
@@ -719,12 +763,17 @@ test()
 		err(1, "immediate read failed");
 
 	warnx("single read");
-	warnx("measurement: %0.2f m", (double)report.distance);
+	// XXX Change such that the results of the whole group are printed:
+	warnx("measurement: %0.2f m", (double)report.distance[0]);
 	warnx("time:        %lld", report.timestamp);
 
 	/* start the sensor polling at 2Hz */
 	if (OK != ioctl(fd, SENSORIOCSPOLLRATE, 2))
 		errx(1, "failed to set 2Hz poll rate");
+
+	/* reset the sensor poll rate */
+	if (OK != ioctl(fd, SENSORIOCSPOLLRATE, SENSOR_POLLRATE_DEFAULT))
+		errx(1, "failed to reset poll rate");
 
 	/* read the sensor 5x and report each value */
 	for (unsigned i = 0; i < 5; i++) {
@@ -745,7 +794,8 @@ test()
 			err(1, "periodic read failed");
 
 		warnx("periodic read %u", i);
-		warnx("measurement: %0.3f", (double)report.distance);
+		// XXX Change such that the results of the whole group are printed:
+		warnx("measurement: %0.3f", (double)report.distance[0]);
 		warnx("time:        %lld", report.timestamp);
 	}
 
@@ -808,7 +858,7 @@ mb12xx_main(int argc, char *argv[])
 				for (i = 4; i < argc; i++) {
 					if (strcmp(argv[i], ",") == 0) {
 						addr[addri-1] |= GROUPEND;
-						printf("%X \n", addr[addri-1]);
+						// printf("%X \n", addr[addri-1]);
 						continue;
 					}
 
