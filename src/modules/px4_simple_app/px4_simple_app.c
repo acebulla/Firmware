@@ -51,7 +51,7 @@ __EXPORT int px4_simple_app_main(int argc, char *argv[]);
 int px4_simple_app_main(int argc, char *argv[])
 {
 	printf("Hello Sky!\n");
-	
+
 	/* subscribe to sensor_combined topic */
 	int sensor_sub_fd = orb_subscribe(ORB_ID(multsens_range_finder));
 	orb_set_interval(sensor_sub_fd, 500);
@@ -106,6 +106,6 @@ int px4_simple_app_main(int argc, char *argv[])
 		}
 		i++;
 	}
- 
+
 	return 0;
 }
