@@ -130,6 +130,8 @@ private:
 	bool				_sensor_ok;
 	int					_measure_ticks;
 
+	uint8_t				_current_values[SERVOS_ATTACHED];
+
 
 
 
@@ -159,6 +161,7 @@ private:
 	/**
 	 * Convert degree or radian to absolute value.
 	 * Cast absolute values from float to uint8_t.
+	 * Enforces boundaries.
 	 *
 	 * @param conv		The to be converted value.
 	 */
@@ -223,233 +226,169 @@ SERVO12C	*g_servo12c;
 }
 
 int
-MB12XX::init()
+SERVO12C::init()
 {
-	int ret = ERROR;
+	int ret = OK;
 
 	/* do I2C init (and probe) first */
 	if (I2C::init() != OK)
-		goto out;
+		ret = -errno;
 
-	/* allocate basic report buffers */
-	_reports = new RingBuffer(2, sizeof(range_finder_multsens_report));
-
-	if (_reports == nullptr)
-		goto out;
-
-	/* get a publish handle on the range finder topic */
-	struct range_finder_multsens_report zero_report;
-	memset(&zero_report, 0, sizeof(zero_report));
-	_range_finder_topic = orb_advertise(ORB_ID(multsens_range_finder), &zero_report);
-
-	if (_range_finder_topic < 0)
-		debug("failed to create multsens_range_finder object. Did you start uOrb?");
-
-	ret = OK;
 	/* sensor is ok, but we don't really know if it is within range */
 	_sensor_ok = true;
-out:
+
+	/* start the HIL interface task */
+	_task = task_spawn_cmd("servo12c",
+			   SCHED_DEFAULT,
+			   SCHED_PRIORITY_DEFAULT,
+			   2048,
+			   (main_t)&SERVO12C::task_main_trampoline,
+			   nullptr);
+
+	if (_task < 0) {
+		debug("task start failed: %d", errno);
+		ret = -errno;
+	}
+
 	return ret;
 }
 
+/*
 int
-MB12XX::probe()
+SERVO12C::probe()
 {
 	return measure();
 }
 
 void
-MB12XX::set_minimum_distance(float min)
+SERVO12C::set_minimum_distance(float min)
 {
 	_min_distance = min;
 }
 
 void
-MB12XX::set_maximum_distance(float max)
+SERVO12C::set_maximum_distance(float max)
 {
 	_max_distance = max;
 }
 
 float
-MB12XX::get_minimum_distance()
+SERVO12C::get_minimum_distance()
 {
 	return _min_distance;
 }
 
 float
-MB12XX::get_maximum_distance()
+SERVO12C::get_maximum_distance()
 {
 	return _max_distance;
 }
+*/
 
 int
-MB12XX::ioctl(struct file *filp, int cmd, unsigned long arg)
+SERVO12C::ioctl(struct file *filp, int cmd, unsigned long arg)
 {
 	switch (cmd) {
 
-	case SENSORIOCSPOLLRATE: {
-			switch (arg) {
+		case SERVO_INPUT: {
+				switch (arg) {
 
-				/* switching to manual polling */
-			case SENSOR_POLLRATE_MANUAL:
-				stop();
-				_measure_ticks = 0;
-				return OK;
-
-				/* external signalling (DRDY) not supported */
-			case SENSOR_POLLRATE_EXTERNAL:
-
-				/* zero would be bad */
-			case 0:
-				return -EINVAL;
-
-				/* set default/max polling rate */
-			case SENSOR_POLLRATE_MAX:
-			case SENSOR_POLLRATE_DEFAULT: {
-					/* do we need to start internal polling? */
-					bool want_start = (_measure_ticks == 0);
-
-					/* set interval for next measurement to minimum legal value */
-					_measure_ticks = USEC2TICK(MB12XX_CONVERSION_INTERVAL);
-
-					/* if we need to start the poll state machine, do it */
-					if (want_start)
-						start();
-
+					/* switching to absolute input values */
+				case SERVO_INPUT_ABS:
+					_input_type = ABS;
 					return OK;
-				}
 
-				/* adjust to a legal polling interval in Hz */
-			default: {
-					/* do we need to start internal polling? */
-					bool want_start = (_measure_ticks == 0);
-
-					/* convert hz to tick interval via microseconds */
-					unsigned ticks = USEC2TICK(1000000 / arg);
-
-					/* check against maximum rate */
-					if (ticks < USEC2TICK(MB12XX_CONVERSION_INTERVAL))
-						return -EINVAL;
-
-					/* update interval for next measurement */
-					_measure_ticks = ticks;
-
-					/* if we need to start the poll state machine, do it */
-					if (want_start)
-						start();
-
+					/* switching to degree input values */
+				case SERVO_INPUT_DEG:
+					_input_type = DEG;
 					return OK;
+
+					/* switching to radian input values */
+				case SERVO_INPUT_RAD:
+					_input_type = RAD;
+					return OK;
+
+					/* other input types are not supported */
+				default:
+					return -EINVAL;
+
 				}
+			break;
 			}
-		}
 
-	case SENSORIOCGPOLLRATE:
-		if (_measure_ticks == 0)
-			return SENSOR_POLLRATE_MANUAL;
-
-		return (1000 / _measure_ticks);
-
-	case SENSORIOCSQUEUEDEPTH: {
-		/* lower bound is mandatory, upper bound is a sanity check */
-		if ((arg < 1) || (arg > 100))
+		/* Other commands are not supported */
+		default:
 			return -EINVAL;
-
-		irqstate_t flags = irqsave();
-		if (!_reports->resize(arg)) {
-			irqrestore(flags);
-			return -ENOMEM;
-		}
-		irqrestore(flags);
-
-		return OK;
 	}
 
-	case SENSORIOCGQUEUEDEPTH:
-		return _reports->size();
 
-	case SENSORIOCRESET:
-		/* XXX implement this */
-		return -EINVAL;
-
-	case RANGEFINDERIOCSETMINIUMDISTANCE:
-	{
-		set_minimum_distance(*(float *)arg);
-		return 0;
-	}
-	break;
-	case RANGEFINDERIOCSETMAXIUMDISTANCE:
-	{
-		set_maximum_distance(*(float *)arg);
-		return 0;
-	}
-	break;
-	default:
-		/* give it to the superclass */
-		return I2C::ioctl(filp, cmd, arg);
-	}
 }
 
 ssize_t
-MB12XX::read(struct file *filp, char *buffer, size_t buflen)
+SERVO12C::read(struct file *filp, char *buffer, size_t buflen)
 {
-	unsigned count = buflen / sizeof(struct range_finder_multsens_report);
-	struct range_finder_multsens_report *rbuf = reinterpret_cast<struct range_finder_multsens_report *>(buffer);
-	int ret = 0;
 
-	/* buffer must be large enough */
-	if (count < 1)
-		return -ENOSPC;
+//	unsigned count = buflen / sizeof(struct range_finder_multsens_report);
+//	struct range_finder_multsens_report *rbuf = reinterpret_cast<struct range_finder_multsens_report *>(buffer);
+//	int ret = 0;
+//
+//	/* buffer must be large enough */
+//	if (count < 1)
+//		return -ENOSPC;
+//
+//	/* if automatic measurement is enabled */
+//	if (_measure_ticks > 0) {
+//
+//		/*
+//		 * While there is space in the caller's buffer, and reports, copy them.
+//		 * Note that we may be pre-empted by the workq thread while we are doing this;
+//		 * we are careful to avoid racing with them.
+//		 */
+//		while (count--) {
+//			if (_reports->get(rbuf)) {
+//				ret += sizeof(*rbuf);
+//				rbuf++;
+//			}
+//		}
+//
+//		/* if there was no data, warn the caller */
+//		return ret ? ret : -EAGAIN;
+//	}
+//
+//	/* manual measurement - run one conversion */
+//	do {
+//		_reports->flush();
+//
+//		/* trigger a measurement */
+//		if (OK != measure()) {
+//			ret = -EIO;
+//			break;
+//		}
+//
+//		/* wait for it to complete */
+//		usleep(MB12XX_CONVERSION_INTERVAL);
+//
+//		/* run the collection phase */
+//		if (OK != collect()) {
+//			ret = -EIO;
+//			break;
+//		}
+//
+//		/* state machine will have generated a report, copy it out */
+//		if (_reports->get(rbuf)) {
+//			ret = sizeof(*rbuf);
+//		}
+//
+//	} while (0);
+//
+//	return ret;
 
-	/* if automatic measurement is enabled */
-	if (_measure_ticks > 0) {
+	return OK;
 
-		/*
-		 * While there is space in the caller's buffer, and reports, copy them.
-		 * Note that we may be pre-empted by the workq thread while we are doing this;
-		 * we are careful to avoid racing with them.
-		 */
-		while (count--) {
-			if (_reports->get(rbuf)) {
-				ret += sizeof(*rbuf);
-				rbuf++;
-			}
-		}
-
-		/* if there was no data, warn the caller */
-		return ret ? ret : -EAGAIN;
-	}
-
-	/* manual measurement - run one conversion */
-	do {
-		_reports->flush();
-
-		/* trigger a measurement */
-		if (OK != measure()) {
-			ret = -EIO;
-			break;
-		}
-
-		/* wait for it to complete */
-		usleep(MB12XX_CONVERSION_INTERVAL);
-
-		/* run the collection phase */
-		if (OK != collect()) {
-			ret = -EIO;
-			break;
-		}
-
-		/* state machine will have generated a report, copy it out */
-		if (_reports->get(rbuf)) {
-			ret = sizeof(*rbuf);
-		}
-
-	} while (0);
-
-	return ret;
 }
 
 int
-MB12XX::measure()
+SERVO12C::set_servo_values()
 {
 	int ret;
 	uint8_t i;
@@ -494,7 +433,7 @@ MB12XX::measure()
 }
 
 int
-MB12XX::collect()
+SERVO12C::collect()
 {
 	int	ret = -EIO;
 	uint8_t i;
@@ -554,7 +493,7 @@ MB12XX::collect()
 }
 
 void
-MB12XX::start()
+SERVO12C::start()
 {
 	/* reset the report ring and state machine */
 	_collect_phase = false;
@@ -563,7 +502,7 @@ MB12XX::start()
 	_sensor_end = 0;
 
 	/* schedule a cycle to start things */
-	work_queue(HPWORK, &_work, (worker_t)&MB12XX::cycle_trampoline, this, 1);
+	work_queue(HPWORK, &_work, (worker_t)&SERVO12C::cycle_trampoline, this, 1);
 
 	/* notify about state change */
 	struct subsystem_info_s info = {
@@ -581,21 +520,21 @@ MB12XX::start()
 }
 
 void
-MB12XX::stop()
+SERVO12C::stop()
 {
 	work_cancel(HPWORK, &_work);
 }
 
 void
-MB12XX::cycle_trampoline(void *arg)
+SERVO12C::cycle_trampoline(void *arg)
 {
-	MB12XX *dev = (MB12XX *)arg;
+	SERVO12C *dev = (SERVO12C *)arg;
 
 	dev->cycle();
 }
 
 void
-MB12XX::cycle()
+SERVO12C::cycle()
 {
 	/* collection phase? */
 	if (_collect_phase) {
@@ -619,7 +558,7 @@ MB12XX::cycle()
 			/* schedule a fresh cycle call when we are ready to measure again */
 			work_queue(HPWORK,
 				   &_work,
-				   (worker_t)&MB12XX::cycle_trampoline,
+				   (worker_t)&SERVO12C::cycle_trampoline,
 				   this,
 				   _measure_ticks - USEC2TICK(MB12XX_CONVERSION_INTERVAL));
 
@@ -637,13 +576,13 @@ MB12XX::cycle()
 	/* schedule a fresh cycle call when the measurement is done */
 	work_queue(HPWORK,
 		   &_work,
-		   (worker_t)&MB12XX::cycle_trampoline,
+		   (worker_t)&SERVO12C::cycle_trampoline,
 		   this,
 		   USEC2TICK(MB12XX_CONVERSION_INTERVAL));
 }
 
 void
-MB12XX::print_info()
+SERVO12C::print_info()
 {
 	perf_print_counter(_sample_perf);
 	perf_print_counter(_comms_errors);

@@ -64,7 +64,7 @@ __BEGIN_DECLS
 /**
  * Number of servos attached.
  */
-#define NUMBER_SERVOS_ATTACHED	2
+#define SERVOS_ATTACHED	2
 
 /**
  * Servo output signal type.
@@ -76,10 +76,10 @@ __BEGIN_DECLS
 typedef float	servo_position_t;
 
 /** Measured characteristics of the individual servo */
-const servo_position_t SERVO_MAX_ABS[NUMBER_SERVOS_ATTACHED] = {255, 255};
-const servo_position_t SERVO_MAX_DEG[NUMBER_SERVOS_ATTACHED] = {180, 180};
-const servo_position_t SERVO_MIN_ABS[NUMBER_SERVOS_ATTACHED] = {0, 0};
-const servo_position_t SERVO_MIN_DEG[NUMBER_SERVOS_ATTACHED] = {0, 0};
+const servo_position_t SERVO_MAX_ABS[SERVOS_ATTACHED] = {255, 255};
+const servo_position_t SERVO_MAX_DEG[SERVOS_ATTACHED] = {180, 180};
+const servo_position_t SERVO_MIN_ABS[SERVOS_ATTACHED] = {0, 0};
+const servo_position_t SERVO_MIN_DEG[SERVOS_ATTACHED] = {0, 0};
 
 
 /**
@@ -88,7 +88,8 @@ const servo_position_t SERVO_MIN_DEG[NUMBER_SERVOS_ATTACHED] = {0, 0};
  */
 struct servo_control_values {
 	/** desired pulse widths for each of the supported channels */
-	servo_position_t	values[NUMBER_SERVOS_ATTACHED];
+	servo_position_t	values[SERVOS_ATTACHED];
+	uint8_t				set_value[SERVOS_ATTACHED];
 };
 
 /*
