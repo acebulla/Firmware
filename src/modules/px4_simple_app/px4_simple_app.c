@@ -45,67 +45,91 @@
 
 #include <uORB/uORB.h>
 #include <drivers/drv_range_finder_multsens.h>
+#include <drivers/drv_servo12c.h>
+
+/* create topic metadate */
+ORB_DEFINE(servo12c_control, struct servo_control_values);
  
 __EXPORT int px4_simple_app_main(int argc, char *argv[]);
  
 int px4_simple_app_main(int argc, char *argv[])
 {
+	int topic_handle;
+
 	printf("Hello Sky!\n");
 
-	/* subscribe to sensor_combined topic */
-	int sensor_sub_fd = orb_subscribe(ORB_ID(multsens_range_finder));
-	orb_set_interval(sensor_sub_fd, 500);
- 
-	/* one could wait for multiple topics with this technique, just using one here */
-	struct pollfd fds[] = {
-		{ .fd = sensor_sub_fd,   .events = POLLIN },
-		/* there could be more file descriptors here, in the form like:
-		 * { .fd = other_sub_fd,   .events = POLLIN },
-		 */
-	};
- 
-	int error_counter = 0;
-	
-	int i = 0;
+	/* generate the initial data for first publication */
+	struct servo_control_values servcon;
+	servcon.values[0] = 10.0f; servcon.set_value[0] = 1;
 
-	/* obtained data for the first file descriptor */
-	struct range_finder_multsens_report raw;
- 
-	while (i < 100) {
-		/* wait for sensor update of 1 file descriptor for 1000 ms (1 second) */
-		int poll_ret = poll(fds, 1, 1000);
- 
-		/* handle the poll result */
-		if (poll_ret == 0) {
-			/* this means none of our providers is giving us data */
-			printf("[px4_simple_app] Got no data within a second\n");
-		} else if (poll_ret < 0) {
-			/* this is seriously bad - should be an emergency */
-			if (error_counter < 10 || error_counter % 50 == 0) {
-				/* use a counter to prevent flooding (and slowing us down) */
-				printf("[px4_simple_app] ERROR return value from poll(): %d\n"
-					, poll_ret);
-			}
-			error_counter++;
-		} else {
- 
-			if (fds[0].revents & POLLIN) {
+	/* advertise the topic and make the initial publication */
+	topic_handle = orb_advertise(ORB_ID(servo12c_control), &servcon);
 
-				/* copy sensors raw data into local buffer */
-				orb_copy(ORB_ID(multsens_range_finder), sensor_sub_fd, &raw);
-				printf("[px4_simple_app] Range finder: Start: %d End: %d Valid: %u Distance:%8.4f m Timestamp: %u \n",
-					raw.sensor_start,
-					raw.sensor_end,
-					raw.valid[raw.sensor_start],
-					raw.distance[raw.sensor_start],
-					raw.timestamp);
-			}
-			/* there could be more file descriptors here, in the form like:
-			 * if (fds[1..n].revents & POLLIN) {}
-			 */
-		}
-		i++;
-	}
+//	usleep(1000);
+//
+//	servcon.values[0] = 10.0f;
+//	orb_publish(ORB_ID(servo12c_control), topic_handle, &servcon);
+//
+//	usleep(1000);
+//
+//	servcon.values[0] = 240.0f;
+//	orb_publish(ORB_ID(servo12c_control), topic_handle, &servcon);
+
+
+//	/* subscribe to sensor_combined topic */
+//	int sensor_sub_fd = orb_subscribe(ORB_ID(multsens_range_finder));
+//	orb_set_interval(sensor_sub_fd, 500);
+//
+//	/* one could wait for multiple topics with this technique, just using one here */
+//	struct pollfd fds[] = {
+//		{ .fd = sensor_sub_fd,   .events = POLLIN },
+//		/* there could be more file descriptors here, in the form like:
+//		 * { .fd = other_sub_fd,   .events = POLLIN },
+//		 */
+//	};
+//
+//	int error_counter = 0;
+//
+//	int i = 0;
+//
+//	/* obtained data for the first file descriptor */
+//	struct range_finder_multsens_report raw;
+//
+//	while (i < 100) {
+//		/* wait for sensor update of 1 file descriptor for 1000 ms (1 second) */
+//		int poll_ret = poll(fds, 1, 1000);
+//
+//		/* handle the poll result */
+//		if (poll_ret == 0) {
+//			/* this means none of our providers is giving us data */
+//			printf("[px4_simple_app] Got no data within a second\n");
+//		} else if (poll_ret < 0) {
+//			/* this is seriously bad - should be an emergency */
+//			if (error_counter < 10 || error_counter % 50 == 0) {
+//				/* use a counter to prevent flooding (and slowing us down) */
+//				printf("[px4_simple_app] ERROR return value from poll(): %d\n"
+//					, poll_ret);
+//			}
+//			error_counter++;
+//		} else {
+//
+//			if (fds[0].revents & POLLIN) {
+//
+//				/* copy sensors raw data into local buffer */
+//				orb_copy(ORB_ID(multsens_range_finder), sensor_sub_fd, &raw);
+//				printf("[px4_simple_app] Range finder: Start: %d End: %d Valid: %u Distance:%8.4f m Timestamp: %u \n",
+//					raw.sensor_start,
+//					raw.sensor_end,
+//					raw.valid[raw.sensor_start],
+//					raw.distance[raw.sensor_start],
+//					raw.timestamp);
+//			}
+//			/* there could be more file descriptors here, in the form like:
+//			 * if (fds[1..n].revents & POLLIN) {}
+//			 */
+//		}
+//		i++;
+//	}
 
 	return 0;
 }

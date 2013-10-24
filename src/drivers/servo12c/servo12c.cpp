@@ -125,12 +125,14 @@ private:
 
 	Input_type			_input_type;
 	int					_task;
-	bool				_task_exit;
-	RingBuffer		*_reports;
+	volatile bool		_task_exit;
+
 	bool				_sensor_ok;
-	int					_measure_ticks;
 
 	uint8_t				_current_values[SERVOS_ATTACHED];
+
+	int					_servo_control_topic;
+	servo_control_values	_controls;
 
 
 
@@ -145,15 +147,15 @@ private:
 	* @param address	The I2C bus address to probe.
 	* @return		True if the device is present.
 	*/
-	int					probe_address(uint8_t address);
+	// int					probe_address(uint8_t address);
 
 	/**
 	* Set the min and max distance thresholds if you want the end points of the sensors
 	* range to be brought in at all, otherwise it will use the defaults MB12XX_MIN_DISTANCE
 	* and MB12XX_MAX_DISTANCE
 	*/
-	float				get_minimum_distance();
-	float				get_maximum_distance();
+	//float				get_minimum_distance();
+	//float				get_maximum_distance();
 
 
 	int					set_servo_values();
@@ -166,14 +168,21 @@ private:
 	 * @param conv		The to be converted value.
 	 */
 
-	uint8_t				convert(float conv);
+	uint8_t				convert(float conv, uint8_t servo);
 
 
-	static void	task_main_trampoline(int argc, char *argv[]);
-	void		task_main() __attribute__((noreturn));
+	static void	task_cycle_trampoline(int argc, char *argv[]);
+	void		task_cycle() __attribute__((noreturn));
 
 
 };
+
+namespace
+{
+
+SERVO12C	*g_servo12c;
+
+}
 
 /*
  * Driver 'main' command.
@@ -183,16 +192,17 @@ extern "C" __EXPORT int servo12c_main(int argc, char *argv[]);
 SERVO12C::SERVO12C(int bus, uint8_t address) :
 	I2C("SERVO12C", SERVO12C_DEVICE_PATH, bus, address, 100000),
 	_input_type(ABS),
-	_reports(nullptr),
-	_sensor_ok(false),
-	_measure_ticks(0),
 	_task(-1),
 	_task_exit(false),
+	_sensor_ok(true),
+	_servo_control_topic(-1),
 	_sample_perf(perf_alloc(PC_ELAPSED, "servo12c_write")),
 	_comms_errors(perf_alloc(PC_COUNT, "servo12c_comms_errors"))
 {
 	// enable debug() calls
 	_debug_enabled = true;
+
+	memset(_current_values, 127, sizeof(_controls));
 }
 
 SERVO12C::~SERVO12C()
@@ -218,12 +228,7 @@ SERVO12C::~SERVO12C()
 		g_servo12c = nullptr;
 }
 
-namespace
-{
 
-SERVO12C	*g_servo12c;
-
-}
 
 int
 SERVO12C::init()
@@ -231,8 +236,10 @@ SERVO12C::init()
 	int ret = OK;
 
 	/* do I2C init (and probe) first */
-	if (I2C::init() != OK)
+	if (I2C::init() != OK) {
+		printf("I2C init gone wrong");
 		ret = -errno;
+	}
 
 	/* sensor is ok, but we don't really know if it is within range */
 	_sensor_ok = true;
@@ -242,8 +249,10 @@ SERVO12C::init()
 			   SCHED_DEFAULT,
 			   SCHED_PRIORITY_DEFAULT,
 			   2048,
-			   (main_t)&SERVO12C::task_main_trampoline,
+			   (main_t)&SERVO12C::task_cycle_trampoline,
 			   nullptr);
+
+	printf("In init(): _task = %d \n", _task);
 
 	if (_task < 0) {
 		debug("task start failed: %d", errno);
@@ -253,13 +262,29 @@ SERVO12C::init()
 	return ret;
 }
 
-/*
+
 int
 SERVO12C::probe()
 {
-	return measure();
-}
+	/*
+	uint8_t msg = 0x51;
+	printf("sizeof(msg) = %d\n", sizeof(msg));
+	return transfer(&msg, sizeof(msg), nullptr, 0);
+	*/
+	int ret;
 
+	//const uint8_t msg[2] = {(uint8_t) 20, (uint8_t) 0};
+	uint8_t msg = 20;
+
+
+	//const uint8_t msg[SERVOS_ATTACHED] = {u , v};
+	printf("sizeof(msg) = %d\n", sizeof(msg));
+
+	ret = transfer(&msg, 1, nullptr, 0);
+
+	return ret;
+}
+/*
 void
 SERVO12C::set_minimum_distance(float min)
 {
@@ -390,195 +415,136 @@ SERVO12C::read(struct file *filp, char *buffer, size_t buflen)
 int
 SERVO12C::set_servo_values()
 {
+	uint8_t msg[SERVOS_ATTACHED+1] = {0, 10, 127};
+	uint8_t * val = &msg[1];
 	int ret;
 	uint8_t i;
 
-	for (i = _sensor_start; i < _sensor_count; i++) {
-		/*
-		 * Adjust the address to the current sensor.
-		 */
-		set_address(_addresses[i] & ADDRPART);
+	/* Start at the first servo (port SERVO0) */
+	msg[0] = 0;
 
-		/*
-		 * Send the command to begin a measurement.
-		 */
-		uint8_t cmd = MB12XX_TAKE_RANGE_REG;
-		ret = transfer(&cmd, 1, nullptr, 0);
-
-		if (OK != ret)
-		{
-			perf_count(_comms_errors);
-			log("i2c::transfer returned %d for sensor with address %X", ret, _addresses[i] & ADDRPART);
-			// XXX Maybe we want to continue if there is a problem with only one sensor
-			_sensor_end = i;
-			return ret;
-		}
-
-		if (_addresses[i] & GROUPEND) {
-			_sensor_end = i;
-			ret = OK;
-			break;
-		}
-
+	/* For every servo, if the value must be adjusted then convert it and store it in the msg array,
+	 * otherwise use the old value.
+	 */
+	for (i = 0; i < SERVOS_ATTACHED; i++) {
+		printf("i = %d, Set value = %d, value = %f \n", i, _controls.set_value[i], _controls.values[i]);
+		val[i] = _controls.set_value[i] ? convert(_controls.values[i], i) : _current_values[i];
+		printf("val = %d \n", val[i]);
 	}
 
-	if (!(_addresses[i] & GROUPEND))
-	{
+	for (i=0; i<SERVOS_ATTACHED+1; i++){
+		printf("msg[%d] = %d \n", i, msg[i]);
+	}
+
+	/*
+	 * Send the command to adjust the servo positions.
+	 */
+	printf("sizeof(msg) = %d\n", sizeof(msg));
+	ret = transfer(msg, sizeof(msg), nullptr, 0);
+
+	if (OK != ret) {
 		perf_count(_comms_errors);
-		log("mb12xx::End of the final sensor group is not marked");
-		ret = -EPERM;
+		log("i2c::transfer returned %d", ret);
+	}
+	else {
+		for (i = 0; i < SERVOS_ATTACHED; i++) {
+			_current_values[i] = val[i];
+		}
 	}
 
 	return ret;
 }
 
-int
-SERVO12C::collect()
+uint8_t
+SERVO12C::convert(float conv, uint8_t servo)
 {
-	int	ret = -EIO;
-	uint8_t i;
-	struct range_finder_multsens_report report;
+	uint8_t ret;
 
-	perf_begin(_sample_perf);
+	switch (_input_type) {
 
-	/* read from the sensor */
-	uint8_t val[2] = {0, 0};
-	report.sensor_start = _sensor_start;
-	i = _sensor_start;
-
-	while (i <= _sensor_end) {
-		set_address(_addresses[i] & ADDRPART);
-
-		ret = transfer(nullptr, 0, &val[0], 2);
-
-		if (ret < 0)
-		{
-			log("error reading from sensor with address %X: %d", _addresses[i] & ADDRPART, ret);
-			perf_count(_comms_errors);
-			perf_end(_sample_perf);
+			/* switching to absolute input values */
+		case ABS:
+			ret = (uint8_t) conv;
+			printf("[SERVO12C] conv: %f \n", conv);
+			printf("[SERVO12C] ret: %d \n", ret);
 			return ret;
+
+			/* switching to degree input values */
+		case DEG:
+			_input_type = DEG;
+			return ret;
+
+			/* switching to radian input values */
+		case RAD:
+			_input_type = RAD;
+			return ret;
+
+			/* other input types are not supported */
+		default:
+			return 127;
+
+
 		}
 
-		uint16_t distance = val[0] << 8 | val[1];
-		float si_units = (distance * 1.0f)/ 100.0f; /* cm to m */
+}
 
-		report.distance[i] = si_units;
-		report.valid[i] = si_units > get_minimum_distance() && si_units < get_maximum_distance() ? 1 : 0;
 
-		i++;
-	}
-
-	report.sensor_end = i-1;
-	_sensor_start = (i < _sensor_count) ? i : 0;
-
-	/* This should be fairly close to the end of the measurement, so the best approximation of the time.
-	 * We record the time after all sensors in the group have been measured.
-	 * */
-	report.timestamp = hrt_absolute_time();
-
-	/* publish it */
-	orb_publish(ORB_ID(multsens_range_finder), _range_finder_topic, &report);
-
-	if (_reports->force(&report)) {
-		perf_count(_buffer_overflows);
-	}
-
-	/* notify anyone waiting for data */
-	poll_notify(POLLIN);
-
-	ret = OK;
-
-	perf_end(_sample_perf);
-	return ret;
+void
+SERVO12C::task_cycle_trampoline(int argc, char *argv[])
+{
+	g_servo12c->task_cycle();
 }
 
 void
-SERVO12C::start()
+SERVO12C::task_cycle()
 {
-	/* reset the report ring and state machine */
-	_collect_phase = false;
-	_reports->flush();
-	_sensor_start = 0;
-	_sensor_end = 0;
+	/* Subscribe to the servo12c_control topic */
+	_servo_control_topic = orb_subscribe(ORB_ID(servo12c_control));
 
-	/* schedule a cycle to start things */
-	work_queue(HPWORK, &_work, (worker_t)&SERVO12C::cycle_trampoline, this, 1);
+	pollfd fds[1];
+	fds[0].fd = _servo_control_topic;
+	fds[0].events = POLLIN;
 
-	/* notify about state change */
-	struct subsystem_info_s info = {
-		true,
-		true,
-		true,
-		SUBSYSTEM_TYPE_RANGEFINDER};
-	static orb_advert_t pub = -1;
+	log("starting");
+	printf("test _task_exit: %d \n", _task_exit);
 
-	if (pub > 0) {
-		orb_publish(ORB_ID(subsystem_info), pub, &info);
-	} else {
-		pub = orb_advertise(ORB_ID(subsystem_info), &info);
-	}
-}
+	/* loop until killed */
+	while (!_task_exit) {
 
-void
-SERVO12C::stop()
-{
-	work_cancel(HPWORK, &_work);
-}
+		//printf("test");
 
-void
-SERVO12C::cycle_trampoline(void *arg)
-{
-	SERVO12C *dev = (SERVO12C *)arg;
 
-	dev->cycle();
-}
+		/* sleep waiting for data, but no more than a second */
+		int ret = ::poll(&fds[0], 2, 1000);
 
-void
-SERVO12C::cycle()
-{
-	/* collection phase? */
-	if (_collect_phase) {
-
-		/* perform collection */
-		if (OK != collect()) {
-			log("collection error");
-			/* restart the measurement state machine */
-			start();
-			return;
+		/* this would be bad... */
+		if (ret < 0) {
+			log("poll error %d", errno);
+			continue;
 		}
 
-		/* next phase is measurement */
-		_collect_phase = false;
+		/* do we have a control update? */
+		if (fds[0].revents & POLLIN) {
 
-		/*
-		 * Is there a collect->measure gap?
-		 */
-		if (_measure_ticks > USEC2TICK(MB12XX_CONVERSION_INTERVAL)) {
+			/* get controls - must always do this to avoid spinning */
+			orb_copy(ORB_ID(servo12c_control), _servo_control_topic, &_controls);
 
-			/* schedule a fresh cycle call when we are ready to measure again */
-			work_queue(HPWORK,
-				   &_work,
-				   (worker_t)&SERVO12C::cycle_trampoline,
-				   this,
-				   _measure_ticks - USEC2TICK(MB12XX_CONVERSION_INTERVAL));
+			set_servo_values();
 
-			return;
 		}
+
 	}
 
-	/* measurement phase */
-	if (OK != measure())
-		log("measure error");
+	::close(_servo_control_topic);
 
-	/* next phase is collection */
-	_collect_phase = true;
 
-	/* schedule a fresh cycle call when the measurement is done */
-	work_queue(HPWORK,
-		   &_work,
-		   (worker_t)&SERVO12C::cycle_trampoline,
-		   this,
-		   USEC2TICK(MB12XX_CONVERSION_INTERVAL));
+	log("stopping");
+
+
+	/* tell the dtor that we are exiting */
+	_task = -1;
+	_exit(0);
+
 }
 
 void
@@ -586,15 +552,13 @@ SERVO12C::print_info()
 {
 	perf_print_counter(_sample_perf);
 	perf_print_counter(_comms_errors);
-	perf_print_counter(_buffer_overflows);
-	printf("poll interval:  %u ticks\n", _measure_ticks);
-	_reports->print_info("report queue");
+
 }
 
 /**
  * Local functions in support of the shell command.
  */
-namespace mb12xx
+namespace servo12c
 {
 
 /* oddly, ERROR is not defined for c++ */
@@ -603,9 +567,9 @@ namespace mb12xx
 #endif
 const int ERROR = -1;
 
-MB12XX	*g_dev;
 
-void	start(uint8_t addresses[], uint8_t sensor_count);
+
+void	start();
 void	stop();
 void	test();
 void	reset();
@@ -615,39 +579,52 @@ void	info();
  * Start the driver.
  */
 void
-start(uint8_t *addresses, uint8_t sensor_count)
+start()
 {
 	int fd;
 
-	if (g_dev != nullptr)
+	if (g_servo12c != nullptr)
 		errx(1, "already started");
 
 	/* create the driver */
-	g_dev = new MB12XX(MB12XX_BUS, addresses, sensor_count);
+	g_servo12c = new SERVO12C(SERVO12C_BUS, SERVO12C_BASEADDR);
 
-	if (g_dev == nullptr)
-		goto fail;
+	printf("Created driver.\n");
 
-	if (OK != g_dev->init())
+	if (g_servo12c == nullptr) {
 		goto fail;
+	}
+
+	if (OK != g_servo12c->init()) {
+		printf("Init was not successful");
+		goto fail;
+	}
 
 	/* set the poll rate to default, starts automatic data collection */
-	fd = open(RANGE_FINDER_DEVICE_PATH, O_RDONLY);
+	fd = open(SERVO12C_DEVICE_PATH, O_RDONLY);
 
-	if (fd < 0)
+	if (fd < 0) {
+		printf("fd: %d", fd);
 		goto fail;
+	}
 
-	if (ioctl(fd, SENSORIOCSPOLLRATE, SENSOR_POLLRATE_DEFAULT) < 0)
+	if (ioctl(fd, SERVO_INPUT, SERVO_INPUT_ABS) < 0) {
+		close(fd);
 		goto fail;
+	}
+
+	close(fd);
 
 	exit(0);
 
 fail:
 
-	if (g_dev != nullptr)
+	printf("In start: we have failed!");
+
+	if (g_servo12c != nullptr)
 	{
-		delete g_dev;
-		g_dev = nullptr;
+		delete g_servo12c;
+		g_servo12c = nullptr;
 	}
 
 	errx(1, "driver start failed");
@@ -658,10 +635,10 @@ fail:
  */
 void stop()
 {
-	if (g_dev != nullptr)
+	if (g_servo12c != nullptr)
 	{
-		delete g_dev;
-		g_dev = nullptr;
+		delete g_servo12c;
+		g_servo12c = nullptr;
 	}
 	else
 	{
@@ -678,57 +655,58 @@ void stop()
 void
 test()
 {
-	struct range_finder_multsens_report report;
-	ssize_t sz;
-	int ret;
 
-	int fd = open(RANGE_FINDER_DEVICE_PATH, O_RDONLY);
-
-	if (fd < 0)
-		err(1, "%s open failed (try 'mb12xx start' if the driver is not running", RANGE_FINDER_DEVICE_PATH);
-
-	/* do a simple demand read */
-	sz = read(fd, &report, sizeof(report));
-
-	if (sz != sizeof(report))
-		err(1, "immediate read failed");
-
-	warnx("single read");
-	// XXX Change such that the results of the whole group are printed:
-	warnx("measurement: %0.2f m", (double)report.distance[0]);
-	warnx("time:        %lld", report.timestamp);
-
-	/* start the sensor polling at 2Hz */
-	if (OK != ioctl(fd, SENSORIOCSPOLLRATE, 2))
-		errx(1, "failed to set 2Hz poll rate");
-
-	/* reset the sensor poll rate */
-	if (OK != ioctl(fd, SENSORIOCSPOLLRATE, SENSOR_POLLRATE_DEFAULT))
-		errx(1, "failed to reset poll rate");
-
-	/* read the sensor 5x and report each value */
-	for (unsigned i = 0; i < 5; i++) {
-		struct pollfd fds;
-
-		/* wait for data to be ready */
-		fds.fd = fd;
-		fds.events = POLLIN;
-		ret = poll(&fds, 1, 2000);
-
-		if (ret != 1)
-			errx(1, "timed out waiting for sensor data");
-
-		/* now go get it */
-		sz = read(fd, &report, sizeof(report));
-
-		if (sz != sizeof(report))
-			err(1, "periodic read failed");
-
-		warnx("periodic read %u", i);
-		// XXX Change such that the results of the whole group are printed:
-		warnx("measurement: %0.3f", (double)report.distance[0]);
-		warnx("time:        %lld", report.timestamp);
-	}
+//	struct range_finder_multsens_report report;
+//	ssize_t sz;
+//	int ret;
+//
+//	int fd = open(RANGE_FINDER_DEVICE_PATH, O_RDONLY);
+//
+//	if (fd < 0)
+//		err(1, "%s open failed (try 'mb12xx start' if the driver is not running", RANGE_FINDER_DEVICE_PATH);
+//
+//	/* do a simple demand read */
+//	sz = read(fd, &report, sizeof(report));
+//
+//	if (sz != sizeof(report))
+//		err(1, "immediate read failed");
+//
+//	warnx("single read");
+//	// XXX Change such that the results of the whole group are printed:
+//	warnx("measurement: %0.2f m", (double)report.distance[0]);
+//	warnx("time:        %lld", report.timestamp);
+//
+//	/* start the sensor polling at 2Hz */
+//	if (OK != ioctl(fd, SENSORIOCSPOLLRATE, 2))
+//		errx(1, "failed to set 2Hz poll rate");
+//
+//	/* reset the sensor poll rate */
+//	if (OK != ioctl(fd, SENSORIOCSPOLLRATE, SENSOR_POLLRATE_DEFAULT))
+//		errx(1, "failed to reset poll rate");
+//
+//	/* read the sensor 5x and report each value */
+//	for (unsigned i = 0; i < 5; i++) {
+//		struct pollfd fds;
+//
+//		/* wait for data to be ready */
+//		fds.fd = fd;
+//		fds.events = POLLIN;
+//		ret = poll(&fds, 1, 2000);
+//
+//		if (ret != 1)
+//			errx(1, "timed out waiting for sensor data");
+//
+//		/* now go get it */
+//		sz = read(fd, &report, sizeof(report));
+//
+//		if (sz != sizeof(report))
+//			err(1, "periodic read failed");
+//
+//		warnx("periodic read %u", i);
+//		// XXX Change such that the results of the whole group are printed:
+//		warnx("measurement: %0.3f", (double)report.distance[0]);
+//		warnx("time:        %lld", report.timestamp);
+//	}
 
 	errx(0, "PASS");
 }
@@ -739,16 +717,16 @@ test()
 void
 reset()
 {
-	int fd = open(RANGE_FINDER_DEVICE_PATH, O_RDONLY);
-
-	if (fd < 0)
-		err(1, "failed ");
-
-	if (ioctl(fd, SENSORIOCRESET, 0) < 0)
-		err(1, "driver reset failed");
-
-	if (ioctl(fd, SENSORIOCSPOLLRATE, SENSOR_POLLRATE_DEFAULT) < 0)
-		err(1, "driver poll restart failed");
+//	int fd = open(RANGE_FINDER_DEVICE_PATH, O_RDONLY);
+//
+//	if (fd < 0)
+//		err(1, "failed ");
+//
+//	if (ioctl(fd, SENSORIOCRESET, 0) < 0)
+//		err(1, "driver reset failed");
+//
+//	if (ioctl(fd, SENSORIOCSPOLLRATE, SENSOR_POLLRATE_DEFAULT) < 0)
+//		err(1, "driver poll restart failed");
 
 	exit(0);
 }
@@ -759,11 +737,12 @@ reset()
 void
 info()
 {
-	if (g_dev == nullptr)
+	if (g_servo12c == nullptr) {
 		errx(1, "driver not running");
+	}
 
-	printf("state @ %p\n", g_dev);
-	g_dev->print_info();
+	printf("state @ %p\n", g_servo12c);
+	//g_servo12c->print_info();
 
 	exit(0);
 }
@@ -771,71 +750,39 @@ info()
 } // namespace
 
 int
-mb12xx_main(int argc, char *argv[])
+servo12c_main(int argc, char *argv[])
 {
 	/*
 	 * Start/load the driver.
 	 */
 	if (!strcmp(argv[1], "start")) {
-		int i;
-		uint8_t addri = 0, addrcount = 0;
-		uint8_t * addr;
-
-		if (argc > 3 && (strcmp(argv[2], "-a") == 0 || strcmp(argv[2], "--addrgroups") == 0)) {
-			addrcount = atoi(argv[3]);
-			// printf("addrcount: %d\n", addrcount);
-			if (addrcount <= MAX_SENSOR_COUNT) {
-				addr = new uint8_t[addrcount];
-				for (i = 4; i < argc; i++) {
-					if (strcmp(argv[i], ",") == 0) {
-						addr[addri-1] |= GROUPEND;
-						// printf("%X \n", addr[addri-1]);
-						continue;
-					}
-
-					addr[addri] = (uint8_t) atoi(argv[i]);
-					// printf("addri: %d\t addr: %d \n", addri, addr[addri]);
-					addri++;
-				}
-
-				/* Last address must be the end of a group in any case. */
-				addr[addri-1] |= GROUPEND;
-			}
-
-			mb12xx::start(addr, addrcount);
+			servo12c::start();
 			return OK;
-		}
-
-		addrcount = 1;
-		addr = new uint8_t[addrcount];
-		addr[0] = MB12XX_BASEADDR | GROUPEND;
-
-		mb12xx::start(addr, addrcount);
 	}
 
 	 /*
 	  * Stop the driver
 	  */
 	 if (!strcmp(argv[1], "stop"))
-		 mb12xx::stop();
+		 servo12c::stop();
 
 	/*
 	 * Test the driver/device.
 	 */
 	if (!strcmp(argv[1], "test"))
-		mb12xx::test();
+		servo12c::test();
 
 	/*
 	 * Reset the driver.
 	 */
 	if (!strcmp(argv[1], "reset"))
-		mb12xx::reset();
+		servo12c::reset();
 
 	/*
 	 * Print driver information.
 	 */
 	if (!strcmp(argv[1], "info") || !strcmp(argv[1], "status"))
-		mb12xx::info();
+		servo12c::info();
 
 	errx(1, "unrecognized command, try 'start', 'test', 'reset' or 'info'");
 }

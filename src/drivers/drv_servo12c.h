@@ -84,6 +84,10 @@ const servo_position_t SERVO_MIN_DEG[SERVOS_ATTACHED] = {0, 0};
 
 /**
  * Servo output structure.
+ * To save memory the length of the array is defined through the
+ * actual number of servos attached SERVOS_ATTACHED.
+ * The first servo must be attached to port SERVO0, the second to
+ * port SERVO1 and so on.
  *
  */
 struct servo_control_values {
