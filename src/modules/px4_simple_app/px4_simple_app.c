@@ -65,15 +65,15 @@ int px4_simple_app_main(int argc, char *argv[])
 	/* advertise the topic and make the initial publication */
 	topic_handle = orb_advertise(ORB_ID(servo12c_control), &servcon);
 
-//	usleep(1000);
-//
-//	servcon.values[0] = 10.0f;
-//	orb_publish(ORB_ID(servo12c_control), topic_handle, &servcon);
-//
-//	usleep(1000);
-//
-//	servcon.values[0] = 240.0f;
-//	orb_publish(ORB_ID(servo12c_control), topic_handle, &servcon);
+	usleep(1000000);
+
+	servcon.values[0] = 127.0f;
+	orb_publish(ORB_ID(servo12c_control), topic_handle, &servcon);
+
+	usleep(1000000);
+
+	servcon.values[0] = 240.0f;
+	orb_publish(ORB_ID(servo12c_control), topic_handle, &servcon);
 
 
 //	/* subscribe to sensor_combined topic */

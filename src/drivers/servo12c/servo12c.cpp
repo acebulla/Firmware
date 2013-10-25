@@ -74,7 +74,7 @@
 
 /* Configuration Constants */
 #define SERVO12C_BUS 			PX4_I2C_BUS_EXPANSION
-#define SERVO12C_BASEADDR 	0x28 /* 7-bit address. 40 decimal */
+#define SERVO12C_BASEADDR 40 /* 7-bit address. 40 decimal */
 
 /* SERVO12C I2C commands */
 
@@ -266,21 +266,21 @@ SERVO12C::init()
 int
 SERVO12C::probe()
 {
-	/*
-	uint8_t msg = 0x51;
-	printf("sizeof(msg) = %d\n", sizeof(msg));
-	return transfer(&msg, sizeof(msg), nullptr, 0);
-	*/
-	int ret;
 
-	//const uint8_t msg[2] = {(uint8_t) 20, (uint8_t) 0};
-	uint8_t msg = 20;
+//	uint8_t msg = 0x51;
+//	printf("sizeof(msg) = %d\n", sizeof(msg));
+//	return transfer(&msg, sizeof(msg), nullptr, 0);
+
+	int ret,i ;
+	const uint8_t msg[2] = {(uint8_t) 0, (uint8_t) 10};
 
 
-	//const uint8_t msg[SERVOS_ATTACHED] = {u , v};
-	printf("sizeof(msg) = %d\n", sizeof(msg));
 
-	ret = transfer(&msg, 1, nullptr, 0);
+		printf("sizeof(msg) = %d\n", sizeof(msg));
+
+		ret = transfer(msg, sizeof(msg), nullptr, 0);
+
+		usleep(100);
 
 	return ret;
 }
