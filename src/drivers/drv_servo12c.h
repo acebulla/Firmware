@@ -45,6 +45,7 @@
 
 #include <stdint.h>
 #include <sys/ioctl.h>
+#include <math.h>
 
 #include "drv_orb_dev.h"
 
@@ -78,9 +79,11 @@ typedef float	servo_position_t;
 /** Measured characteristics of the individual servo */
 const servo_position_t SERVO_MAX_ABS[SERVOS_ATTACHED] = {255, 255};
 const servo_position_t SERVO_MAX_DEG[SERVOS_ATTACHED] = {180, 180};
+const servo_position_t SERVO_MAX_RAD[SERVOS_ATTACHED] = {M_PI, M_PI};
+
 const servo_position_t SERVO_MIN_ABS[SERVOS_ATTACHED] = {0, 0};
 const servo_position_t SERVO_MIN_DEG[SERVOS_ATTACHED] = {0, 0};
-
+const servo_position_t SERVO_MIN_RAD[SERVOS_ATTACHED] = {0, 0};
 
 /**
  * Servo output structure.
@@ -100,6 +103,7 @@ struct servo_control_values {
  * ORB tag for servo control.
  */
 ORB_DECLARE(servo12c_control);
+
 
 /*
  * ioctl() definitions

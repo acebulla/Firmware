@@ -130,6 +130,7 @@ private:
 	bool				_sensor_ok;
 
 	uint8_t				_current_values[SERVOS_ATTACHED];
+	float				_conversion_values[SERVOS_ATTACHED];
 
 	int					_servo_control_topic;
 	servo_control_values	_controls;
@@ -199,8 +200,11 @@ SERVO12C::SERVO12C(int bus, uint8_t address) :
 	_sample_perf(perf_alloc(PC_ELAPSED, "servo12c_write")),
 	_comms_errors(perf_alloc(PC_COUNT, "servo12c_comms_errors"))
 {
+
 	// enable debug() calls
 	_debug_enabled = true;
+
+
 
 	memset(_current_values, 127, sizeof(_controls));
 }
@@ -267,52 +271,25 @@ int
 SERVO12C::probe()
 {
 
-//	uint8_t msg = 0x51;
-//	printf("sizeof(msg) = %d\n", sizeof(msg));
-//	return transfer(&msg, sizeof(msg), nullptr, 0);
-
 	int ret,i ;
 	const uint8_t msg[2] = {(uint8_t) 0, (uint8_t) 10};
 
 
 
-		printf("sizeof(msg) = %d\n", sizeof(msg));
+	printf("sizeof(msg) = %d\n", sizeof(msg));
 
-		ret = transfer(msg, sizeof(msg), nullptr, 0);
+	ret = transfer(msg, sizeof(msg), nullptr, 0);
 
-		usleep(100);
+
 
 	return ret;
 }
-/*
-void
-SERVO12C::set_minimum_distance(float min)
-{
-	_min_distance = min;
-}
 
-void
-SERVO12C::set_maximum_distance(float max)
-{
-	_max_distance = max;
-}
-
-float
-SERVO12C::get_minimum_distance()
-{
-	return _min_distance;
-}
-
-float
-SERVO12C::get_maximum_distance()
-{
-	return _max_distance;
-}
-*/
 
 int
 SERVO12C::ioctl(struct file *filp, int cmd, unsigned long arg)
 {
+	uint8_t i;
 	switch (cmd) {
 
 		case SERVO_INPUT: {
@@ -326,11 +303,17 @@ SERVO12C::ioctl(struct file *filp, int cmd, unsigned long arg)
 					/* switching to degree input values */
 				case SERVO_INPUT_DEG:
 					_input_type = DEG;
+					for (i = 0; i < SERVOS_ATTACHED; i++) {
+						_conversion_values[i] = (SERVO_MAX_ABS[i] - SERVO_MIN_ABS[i]) / (SERVO_MAX_DEG[i] - SERVO_MIN_DEG[i]);
+					}
 					return OK;
 
 					/* switching to radian input values */
 				case SERVO_INPUT_RAD:
 					_input_type = RAD;
+					for (i = 0; i < SERVOS_ATTACHED; i++) {
+						_conversion_values[i] = (SERVO_MAX_ABS[i] - SERVO_MIN_ABS[i]) / (SERVO_MAX_RAD[i] - SERVO_MIN_RAD[i]);
+					}
 					return OK;
 
 					/* other input types are not supported */
@@ -462,21 +445,41 @@ SERVO12C::convert(float conv, uint8_t servo)
 
 	switch (_input_type) {
 
-			/* switching to absolute input values */
+
 		case ABS:
 			ret = (uint8_t) conv;
 			printf("[SERVO12C] conv: %f \n", conv);
 			printf("[SERVO12C] ret: %d \n", ret);
 			return ret;
 
-			/* switching to degree input values */
+
 		case DEG:
-			_input_type = DEG;
+			if (conv < SERVO_MIN_DEG[servo]) {
+				return (uint8_t) SERVO_MIN_ABS[servo];
+			}
+			else if (conv > SERVO_MAX_DEG[servo]) {
+				return (uint8_t) SERVO_MAX_ABS[servo];
+			}
+
+			ret = SERVO_MIN_ABS[servo] + _conversion_values[servo] * (conv - SERVO_MIN_DEG[servo]);
+			ret = (uint8_t) roundf(ret);
+			printf("[SERVO12C] conv: %f \n", conv);
+			printf("[SERVO12C] ret: %d \n", ret);
 			return ret;
 
-			/* switching to radian input values */
+
 		case RAD:
-			_input_type = RAD;
+			if (conv < SERVO_MIN_DEG[servo]) {
+				return (uint8_t) SERVO_MIN_ABS[servo];
+			}
+			else if (conv > SERVO_MAX_DEG[servo]) {
+				return (uint8_t) SERVO_MAX_ABS[servo];
+			}
+
+			ret = SERVO_MIN_ABS[servo] + _conversion_values[servo] * (conv - SERVO_MIN_RAD[servo]);
+			ret = (uint8_t) roundf(ret);
+			printf("[SERVO12C] conv: %f \n", conv);
+			printf("[SERVO12C] ret: %d \n", ret);
 			return ret;
 
 			/* other input types are not supported */
