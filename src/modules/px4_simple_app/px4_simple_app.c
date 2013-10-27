@@ -54,7 +54,7 @@ int px4_simple_app_main(int argc, char *argv[])
 {
 	/* subscribe to sensor_combined topic */
 	int sensor_sub_fd = orb_subscribe(ORB_ID(multsens_range_finder));
-	// orb_set_interval(sensor_sub_fd, 500);
+	orb_set_interval(sensor_sub_fd, 500);
 
 	/* one could wait for multiple topics with this technique, just using one here */
 	struct pollfd fds[] = {
@@ -104,8 +104,10 @@ int px4_simple_app_main(int argc, char *argv[])
 			 * if (fds[1..n].revents & POLLIN) {}
 			 */
 		}
+
 		i++;
 	}
+	close(sensor_sub_fd);
 
 	return 0;
 }

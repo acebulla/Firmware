@@ -241,7 +241,7 @@ SERVO12C::init()
 
 	/* do I2C init (and probe) first */
 	if (I2C::init() != OK) {
-		printf("I2C init gone wrong");
+		//printf("I2C init gone wrong");
 		ret = -errno;
 	}
 
@@ -256,7 +256,7 @@ SERVO12C::init()
 			   (main_t)&SERVO12C::task_cycle_trampoline,
 			   nullptr);
 
-	printf("In init(): _task = %d \n", _task);
+	//printf("In init(): _task = %d \n", _task);
 
 	if (_task < 0) {
 		debug("task start failed: %d", errno);
@@ -276,7 +276,7 @@ SERVO12C::probe()
 
 
 
-	printf("sizeof(msg) = %d\n", sizeof(msg));
+	//printf("sizeof(msg) = %d\n", sizeof(msg));
 
 	ret = transfer(msg, sizeof(msg), nullptr, 0);
 
@@ -410,19 +410,19 @@ SERVO12C::set_servo_values()
 	 * otherwise use the old value.
 	 */
 	for (i = 0; i < SERVOS_ATTACHED; i++) {
-		printf("i = %d, Set value = %d, value = %f \n", i, _controls.set_value[i], _controls.values[i]);
+		//printf("i = %d, Set value = %d, value = %f \n", i, _controls.set_value[i], _controls.values[i]);
 		val[i] = _controls.set_value[i] ? convert(_controls.values[i], i) : _current_values[i];
-		printf("val = %d \n", val[i]);
+		//printf("val = %d \n", val[i]);
 	}
 
-	for (i=0; i<SERVOS_ATTACHED+1; i++){
-		printf("msg[%d] = %d \n", i, msg[i]);
-	}
+//	for (i=0; i<SERVOS_ATTACHED+1; i++){
+//		printf("msg[%d] = %d \n", i, msg[i]);
+//	}
 
 	/*
 	 * Send the command to adjust the servo positions.
 	 */
-	printf("sizeof(msg) = %d\n", sizeof(msg));
+	//printf("sizeof(msg) = %d\n", sizeof(msg));
 	ret = transfer(msg, sizeof(msg), nullptr, 0);
 
 	if (OK != ret) {
@@ -448,8 +448,8 @@ SERVO12C::convert(float conv, uint8_t servo)
 
 		case ABS:
 			ret = (uint8_t) conv;
-			printf("[SERVO12C] conv: %f \n", conv);
-			printf("[SERVO12C] ret: %d \n", ret);
+			//printf("[SERVO12C] conv: %f \n", conv);
+			//printf("[SERVO12C] ret: %d \n", ret);
 			return ret;
 
 
@@ -463,8 +463,8 @@ SERVO12C::convert(float conv, uint8_t servo)
 
 			ret = SERVO_MIN_ABS[servo] + _conversion_values[servo] * (conv - SERVO_MIN_DEG[servo]);
 			ret = (uint8_t) roundf(ret);
-			printf("[SERVO12C] conv: %f \n", conv);
-			printf("[SERVO12C] ret: %d \n", ret);
+			//printf("[SERVO12C] conv: %f \n", conv);
+			//printf("[SERVO12C] ret: %d \n", ret);
 			return ret;
 
 
@@ -478,8 +478,8 @@ SERVO12C::convert(float conv, uint8_t servo)
 
 			ret = SERVO_MIN_ABS[servo] + _conversion_values[servo] * (conv - SERVO_MIN_RAD[servo]);
 			ret = (uint8_t) roundf(ret);
-			printf("[SERVO12C] conv: %f \n", conv);
-			printf("[SERVO12C] ret: %d \n", ret);
+			//printf("[SERVO12C] conv: %f \n", conv);
+			//printf("[SERVO12C] ret: %d \n", ret);
 			return ret;
 
 			/* other input types are not supported */
@@ -509,7 +509,7 @@ SERVO12C::task_cycle()
 	fds[0].events = POLLIN;
 
 	log("starting");
-	printf("test _task_exit: %d \n", _task_exit);
+	//printf("test _task_exit: %d \n", _task_exit);
 
 	/* loop until killed */
 	while (!_task_exit) {
@@ -518,7 +518,7 @@ SERVO12C::task_cycle()
 
 
 		/* sleep waiting for data, but no more than a second */
-		int ret = ::poll(&fds[0], 2, 1000);
+		int ret = ::poll(&fds[0], 1, 1000);
 
 		/* this would be bad... */
 		if (ret < 0) {
@@ -592,14 +592,14 @@ start()
 	/* create the driver */
 	g_servo12c = new SERVO12C(SERVO12C_BUS, SERVO12C_BASEADDR);
 
-	printf("Created driver.\n");
+	//printf("Created driver.\n");
 
 	if (g_servo12c == nullptr) {
 		goto fail;
 	}
 
 	if (OK != g_servo12c->init()) {
-		printf("Init was not successful");
+		//printf("Init was not successful");
 		goto fail;
 	}
 
@@ -607,7 +607,7 @@ start()
 	fd = open(SERVO12C_DEVICE_PATH, O_RDONLY);
 
 	if (fd < 0) {
-		printf("fd: %d", fd);
+		//printf("fd: %d", fd);
 		goto fail;
 	}
 
@@ -622,7 +622,7 @@ start()
 
 fail:
 
-	printf("In start: we have failed!");
+	//printf("In start: we have failed!");
 
 	if (g_servo12c != nullptr)
 	{
@@ -744,7 +744,7 @@ info()
 		errx(1, "driver not running");
 	}
 
-	printf("state @ %p\n", g_servo12c);
+	//printf("state @ %p\n", g_servo12c);
 	//g_servo12c->print_info();
 
 	exit(0);
