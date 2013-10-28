@@ -593,6 +593,10 @@ FixedwingAttitudeControl::task_main()
 					pitch_sp = _att_sp.pitch_body;
 					throttle_sp = _att_sp.thrust;
 
+					/* reset integrals where needed */
+					if (_att_sp.roll_reset_integral)
+						_roll_ctrl.reset_integrator();
+
 				} else {
 					/*
 					 * Scale down roll and pitch as the setpoints are radians
@@ -678,6 +682,10 @@ FixedwingAttitudeControl::task_main()
 				_actuators.control[3] = _manual.throttle;
 				_actuators.control[4] = _manual.flaps;
 			}
+
+			_actuators.control[5] = _manual.aux1;
+			_actuators.control[6] = _manual.aux2;
+			_actuators.control[7] = _manual.aux3;
 
 			/* lazily publish the setpoint only once available */
 			_actuators.timestamp = hrt_absolute_time();
