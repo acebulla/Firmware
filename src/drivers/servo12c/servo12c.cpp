@@ -760,7 +760,6 @@ servo12c_main(int argc, char *argv[])
 	 */
 	if (!strcmp(argv[1], "start")) {
 			servo12c::start();
-			return OK;
 	}
 
 	 /*

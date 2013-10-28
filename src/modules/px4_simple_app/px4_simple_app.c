@@ -39,6 +39,7 @@
  
 #include <nuttx/config.h>
 #include <unistd.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
 #include <poll.h>
@@ -71,7 +72,7 @@ int px4_simple_app_main(int argc, char *argv[])
 	/* obtained data for the first file descriptor */
 	struct range_finder_multsens_report raw;
 
-	while (i < 100) {
+	while (i < 50) {
 		/* wait for sensor update of 1 file descriptor for 1000 ms (1 second) */
 		int poll_ret = poll(fds, 1, 1000);
 
@@ -108,6 +109,6 @@ int px4_simple_app_main(int argc, char *argv[])
 		i++;
 	}
 	close(sensor_sub_fd);
-
-	return 0;
+	printf("[PX4_SIMPLE_APP] Terminated successfully.\n");
+	exit(0);
 }
