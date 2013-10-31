@@ -140,7 +140,7 @@ SERVO12C_TEST::servo12c_test_thread_main() {
 
 	if (thread_should_run) {
 		/* start calling the thread at the specified rate */
-		hrt_call_after(&_call, 500000, (hrt_callout)&SERVO12C_TEST::_test_trampoline, this);
+		hrt_call_after(&_call, 200000, (hrt_callout)&SERVO12C_TEST::_test_trampoline, this);
 	}
 
 	return 0;

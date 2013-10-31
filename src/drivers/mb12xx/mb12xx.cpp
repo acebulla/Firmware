@@ -544,12 +544,8 @@ MB12XX::collect()
 	 * We record the time after all sensors in the group have been measured.
 	 * */
 	report.timestamp = hrt_absolute_time();
-<<<<<<< HEAD
-=======
-        report.error_count = perf_event_count(_comms_errors);
-	report.distance = si_units;
-	report.valid = si_units > get_minimum_distance() && si_units < get_maximum_distance() ? 1 : 0;
->>>>>>> upstream/master
+
+
 	
 	/* publish it */
 	orb_publish(ORB_ID(multsens_range_finder), _range_finder_topic, &report);
