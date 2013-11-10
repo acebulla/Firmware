@@ -533,7 +533,6 @@ MB12XX::collect()
 
 		report.distance[i] = si_units;
 		report.valid[i] = si_units > get_minimum_distance() && si_units < get_maximum_distance() ? 1 : 0;
-
 		i++;
 	}
 	
@@ -544,6 +543,7 @@ MB12XX::collect()
 	 * We record the time after all sensors in the group have been measured.
 	 * */
 	report.timestamp = hrt_absolute_time();
+	//log("%u", report.timestamp);
 
 
 	

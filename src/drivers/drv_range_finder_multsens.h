@@ -46,7 +46,7 @@
 
 #define RANGE_FINDER_DEVICE_PATH	"/dev/range_finder"
 
-#define MAX_SENSOR_COUNT 4	/** Maximum number of sensor */
+#define MAX_SENSOR_COUNT 6	/** Maximum number of sensor */
 #define GROUPEND 0x80	/** Bitmask indicating the end of an address group */
 #define ADDRPART 0x7F	/** Bitmask for extracting the address part */
 
