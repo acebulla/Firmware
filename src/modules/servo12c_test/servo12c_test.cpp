@@ -40,10 +40,12 @@
 #include <nuttx/config.h>
 #include <nuttx/sched.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <errno.h>
 #include <string.h>
+#include <fcntl.h>
 
 #include <systemlib/systemlib.h>
 #include <systemlib/err.h>
@@ -52,8 +54,7 @@
 #include <drivers/drv_hrt.h>
 
 
-/* create topic metadate */
-ORB_DEFINE(servo12c_control, struct servo_control_values);
+
 
 
 /**
@@ -69,25 +70,35 @@ class SERVO12C_TEST
 public:
 	~SERVO12C_TEST();
 
-	void start();
+	void start(char manual);
 	void stop();
+	void set_values(float values[], char * inputType);
 
 private:
-/**
- * Mainloop of daemon.
- */
-int servo12c_test_thread_main();
+	enum Input_type {
+				ABS,
+				DEG,
+		        RAD
+			};
 
-/** work trampoline */
-static void		_test_trampoline(void *arg);
+	/**
+	 * Mainloop of daemon.
+	 */
+	int servo12c_test_thread_main();
+
+	/** work trampoline */
+	static void		_test_trampoline(void *arg);
 
 
-struct hrt_call		_call;
+	struct hrt_call		_call;
 
-bool left;
-bool thread_should_run;
-int topic_handle;
-struct servo_control_values servcon;
+	Input_type	_input_type;
+	float _value[SERVOS_ATTACHED]; bool _new_val;
+	bool _manual;
+	bool _left;
+	bool thread_should_run;
+	int topic_handle;
+	struct servo_control_values servcon;
 
 };
 
@@ -98,17 +109,23 @@ SERVO12C_TEST::~SERVO12C_TEST()
 }
 
 void
-SERVO12C_TEST::start()
+SERVO12C_TEST::start(char manual)
 {
 	thread_should_run = true;
+	printf("char manual: %d", manual);
+	_manual = (bool) manual;
+	printf("bool manual: %d", _manual);
+	uint8_t i;
 
 	/* start calling the thread at the specified rate */
 	hrt_call_after(&_call, 1000, (hrt_callout)&SERVO12C_TEST::_test_trampoline, this);
 
 	/* generate the initial data for first publication */
-
-	servcon.values[0] = 10.0f; servcon.set_value[0] = 1;
-	left = false;
+	for (i = 0; i < SERVOS_ATTACHED; i++)
+	{
+		servcon.values[i] = 10.0f; servcon.set_value[i] = 1;
+	}
+	_left = false;
 
 	/* advertise the topic and make the initial publication */
 	topic_handle = orb_advertise(ORB_ID(servo12c_control), &servcon);
@@ -131,10 +148,105 @@ SERVO12C_TEST::_test_trampoline(void *arg)
 	(reinterpret_cast<SERVO12C_TEST *>(arg))->servo12c_test_thread_main();
 }
 
+void
+SERVO12C_TEST::set_values(float values[], char * inputType)
+{
+	uint8_t i;
+	int fd;
+	if (!strcmp(inputType, "ABS") && _input_type != ABS)
+	{
+		/* set the poll rate to default, starts automatic data collection */
+		fd = open(SERVO12C_DEVICE_PATH, O_RDONLY);
+
+		if (fd < 0) {
+			//printf("fd: %d", fd);
+			goto fail;
+		}
+
+		if (ioctl(fd, SERVO_INPUT, SERVO_INPUT_ABS) < 0) {
+			close(fd);
+			goto fail;
+		}
+
+		close(fd);
+
+		_input_type = ABS;
+	} else if (!strcmp(inputType, "DEG") && _input_type != DEG)
+	{
+		/* set the poll rate to default, starts automatic data collection */
+		fd = open(SERVO12C_DEVICE_PATH, O_RDONLY);
+
+		if (fd < 0) {
+			//printf("fd: %d", fd);
+			goto fail;
+		}
+
+		if (ioctl(fd, SERVO_INPUT, SERVO_INPUT_DEG) < 0) {
+			close(fd);
+			goto fail;
+		}
+
+		close(fd);
+
+		_input_type = DEG;
+	} else if  (!strcmp(inputType, "RAD") && _input_type != RAD)
+	{
+		/* set the poll rate to default, starts automatic data collection */
+		fd = open(SERVO12C_DEVICE_PATH, O_RDONLY);
+
+		if (fd < 0) {
+			//printf("fd: %d", fd);
+			goto fail;
+		}
+
+		if (ioctl(fd, SERVO_INPUT, SERVO_INPUT_RAD) < 0) {
+			close(fd);
+			goto fail;
+		}
+
+		close(fd);
+
+		_input_type = RAD;
+	}
+
+	for (i = 0; i < SERVOS_ATTACHED; i++)
+	{
+		_value[i] = values[i];
+	}
+
+	_new_val = true;
+	_manual = true;
+
+	return;
+
+fail:
+
+	errx(1, "Could not set input type");
+}
+
 int
 SERVO12C_TEST::servo12c_test_thread_main() {
-	servcon.values[0] = (left) ? 245.0f : 5.0f;
-	left = !left;
+	uint8_t i;
+	if (_manual)
+	{
+		if (_new_val)
+		{
+			for (i = 0; i < SERVOS_ATTACHED; i++)
+			{
+				servcon.values[i] = _value[i];
+				servcon.set_value[i] = 1;
+			}
+			_new_val = false;
+		}
+	}
+	else
+	{
+		for (i = 0; i < SERVOS_ATTACHED; i++)
+		{
+			servcon.values[i] = (_left) ? 245.0f : 5.0f;
+		}
+		_left = !_left;
+	}
 
 	orb_publish(ORB_ID(servo12c_control), topic_handle, &servcon);
 
@@ -154,8 +266,9 @@ namespace servo12c_test
 
 SERVO12C_TEST	*g_servo12c_test;
 
-void	start();
+void	start(char manual);
 void	stop();
+void	set_values(float values[], char * inputType);
 void	usage(const char *reason);
 
 
@@ -163,7 +276,7 @@ void	usage(const char *reason);
  * Start the driver.
  */
 void
-start()
+start(char manual)
 {
 	if (g_servo12c_test != nullptr)
 		errx(1, "already started");
@@ -174,7 +287,7 @@ start()
 	if (g_servo12c_test == nullptr)
 		goto fail;
 
-	g_servo12c_test->start();
+	g_servo12c_test->start(manual);
 
 	exit(0);
 fail:
@@ -193,6 +306,14 @@ stop()
 	g_servo12c_test->stop();
 	delete g_servo12c_test;
 	g_servo12c_test = nullptr;
+	exit(0);
+}
+
+void
+set_values(float values[], char * inputType)
+{
+	g_servo12c_test->set_values(values, inputType);
+
 	exit(0);
 }
 
@@ -222,7 +343,24 @@ servo12c_test_main(int argc, char *argv[])
 
 	if (!strcmp(argv[1], "start")) {
 
-		servo12c_test::start();
+		servo12c_test::start(0);
+	}
+
+	if (!strcmp(argv[1], "startmanual")) {
+		servo12c_test::start(1);
+	}
+
+	if (!strcmp(argv[1], "ABS") || !strcmp(argv[1], "DEG") || !strcmp(argv[1], "RAD"))
+	{
+		uint8_t i;
+		float values[SERVOS_ATTACHED];
+
+		for (i = 2; i < SERVOS_ATTACHED + 2; i++)
+		{
+			values[i-2] = (float) atof(argv[i]);
+		}
+
+		servo12c_test::set_values(values, argv[1]);
 	}
 
 	if (!strcmp(argv[1], "stop")) {

@@ -55,7 +55,7 @@ int px4_simple_app_main(int argc, char *argv[])
 {
 	/* subscribe to sensor_combined topic */
 	int sensor_sub_fd = orb_subscribe(ORB_ID(multsens_range_finder));
-	orb_set_interval(sensor_sub_fd, 500);
+	orb_set_interval(sensor_sub_fd, 541);
 
 	/* one could wait for multiple topics with this technique, just using one here */
 	struct pollfd fds[] = {
@@ -72,7 +72,7 @@ int px4_simple_app_main(int argc, char *argv[])
 	/* obtained data for the first file descriptor */
 	struct range_finder_multsens_report raw;
 
-	while (i<50) {
+	while (true) {
 		/* wait for sensor update of 1 file descriptor for 1000 ms (1 second) */
 		int poll_ret = poll(fds, 1, 1000);
 

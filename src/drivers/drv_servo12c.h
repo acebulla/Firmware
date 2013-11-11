@@ -51,6 +51,7 @@
 
 __BEGIN_DECLS
 
+#define PI 3.14159F
 /**
  * Path for the Servo12c chip.
  *
@@ -74,16 +75,16 @@ __BEGIN_DECLS
  * 		-) degree: 0° .. 180°
  * 		-) radian: 0*pi .. 2*pi
  */
-typedef float	servo_position_t;
+typedef float	servo_position_f;
 
 /** Measured characteristics of the individual servo */
-const servo_position_t SERVO_MAX_ABS[SERVOS_ATTACHED] = {255, 255};
-const servo_position_t SERVO_MAX_DEG[SERVOS_ATTACHED] = {180, 180};
-const servo_position_t SERVO_MAX_RAD[SERVOS_ATTACHED] = {M_PI, M_PI};
+const servo_position_f SERVO_MAX_ABS[SERVOS_ATTACHED] = {255, 255};
+const servo_position_f SERVO_MAX_DEG[SERVOS_ATTACHED] = {180, 180};
+const servo_position_f SERVO_MAX_RAD[SERVOS_ATTACHED] = {PI, PI};
 
-const servo_position_t SERVO_MIN_ABS[SERVOS_ATTACHED] = {0, 0};
-const servo_position_t SERVO_MIN_DEG[SERVOS_ATTACHED] = {0, 0};
-const servo_position_t SERVO_MIN_RAD[SERVOS_ATTACHED] = {0, 0};
+const servo_position_f SERVO_MIN_ABS[SERVOS_ATTACHED] = {0, 0};
+const servo_position_f SERVO_MIN_DEG[SERVOS_ATTACHED] = {0, 0};
+const servo_position_f SERVO_MIN_RAD[SERVOS_ATTACHED] = {0, 0};
 
 /**
  * Servo output structure.
@@ -95,7 +96,7 @@ const servo_position_t SERVO_MIN_RAD[SERVOS_ATTACHED] = {0, 0};
  */
 struct servo_control_values {
 	/** desired pulse widths for each of the supported channels */
-	servo_position_t	values[SERVOS_ATTACHED];
+	servo_position_f	values[SERVOS_ATTACHED];
 	uint8_t				set_value[SERVOS_ATTACHED];
 };
 
