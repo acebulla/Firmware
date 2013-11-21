@@ -125,6 +125,8 @@ static void	l_home(const struct listener *l);
 static void	l_airspeed(const struct listener *l);
 static void	l_nav_cap(const struct listener *l);
 
+static void	l_range_finder(const struct listener *l);
+
 static const struct listener listeners[] = {
 	{l_sensor_combined,		&mavlink_subs.sensor_sub,	0},
 	{l_vehicle_attitude,		&mavlink_subs.att_sub,		0},
@@ -151,6 +153,7 @@ static const struct listener listeners[] = {
 	{l_home,			&mavlink_subs.home_sub,		0},
 	{l_airspeed,			&mavlink_subs.airspeed_sub,		0},
 	{l_nav_cap,			&mavlink_subs.navigation_capabilities_sub,		0},
+	{l_range_finder,			&mavlink_subs.range_finder,		0},
 };
 
 static const unsigned n_listeners = sizeof(listeners) / sizeof(listeners[0]);
@@ -705,6 +708,24 @@ l_nav_cap(const struct listener *l)
 				   "turn dist",
 				   nav_cap.turn_distance);
 
+}
+
+void
+l_range_finder(const struct listener *l)
+{
+	uint8_t i;
+	struct range_finder_multsens_report range_finder;
+	uint16_t distance[6];
+
+	orb_copy(ORB_ID(multsens_range_finder), mavlink_subs.range_finder, &range_finder);
+
+	for (i=0; i<6; i++) {
+		distance[i] = cm_uint16_from_m_float(range_finder.distance[i]);
+	}
+
+	mavlink_msg_range_finder_send(MAVLINK_COMM_0,
+									distance, range_finder.valid,
+									range_finder.sensor_start, range_finder.sensor_end);
 }
 
 static void *
