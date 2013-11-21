@@ -245,6 +245,10 @@ SERVO12C::init()
 		ret = -errno;
 	}
 
+	/* Use standard mode
+	const uint8_t msg[2] = {SERVO12C_MODE_REG, SERVO12C_STANDARD_MODE};
+	transfer(msg, sizeof(msg), nullptr, 0); */
+
 	/* sensor is ok, but we don't really know if it is within range */
 	_sensor_ok = true;
 
@@ -272,9 +276,13 @@ SERVO12C::probe()
 {
 
 	int ret,i ;
-	const uint8_t msg[2] = {(uint8_t) 0, (uint8_t) 10};
 
-
+	uint8_t msg[SERVOS_ATTACHED + 1];
+	msg[0] = 0;
+	for (i = 1; i <= SERVOS_ATTACHED; i++)
+	{
+		msg[i] = 10;
+	}
 
 	//printf("sizeof(msg) = %d\n", sizeof(msg));
 

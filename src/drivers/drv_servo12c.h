@@ -79,7 +79,7 @@ typedef float	servo_position_f;
 
 /** Measured characteristics of the individual servo */
 const servo_position_f SERVO_MAX_ABS[SERVOS_ATTACHED] = {255, 255};
-const servo_position_f SERVO_MAX_DEG[SERVOS_ATTACHED] = {180, 180};
+const servo_position_f SERVO_MAX_DEG[SERVOS_ATTACHED] = {180, 173};
 const servo_position_f SERVO_MAX_RAD[SERVOS_ATTACHED] = {PI, PI};
 
 const servo_position_f SERVO_MIN_ABS[SERVOS_ATTACHED] = {0, 0};

@@ -112,13 +112,9 @@ void
 SERVO12C_TEST::start(char manual)
 {
 	thread_should_run = true;
-	printf("char manual: %d", manual);
 	_manual = (bool) manual;
-	printf("bool manual: %d", _manual);
+	int fd;
 	uint8_t i;
-
-	/* start calling the thread at the specified rate */
-	hrt_call_after(&_call, 1000, (hrt_callout)&SERVO12C_TEST::_test_trampoline, this);
 
 	/* generate the initial data for first publication */
 	for (i = 0; i < SERVOS_ATTACHED; i++)
@@ -127,8 +123,28 @@ SERVO12C_TEST::start(char manual)
 	}
 	_left = false;
 
+	/* Tell driver to use absolute values */
+	fd = open(SERVO12C_DEVICE_PATH, O_RDONLY);
+
+	if (fd < 0) {
+		//printf("fd: %d", fd);
+		errx(1, "Could not set input type");
+	}
+
+	if (ioctl(fd, SERVO_INPUT, SERVO_INPUT_ABS) < 0) {
+		close(fd);
+		errx(1, "Could not set input type");
+	}
+
+	close(fd);
+
+	_input_type = ABS;
+
 	/* advertise the topic and make the initial publication */
 	topic_handle = orb_advertise(ORB_ID(servo12c_control), &servcon);
+
+	/* start calling the thread at the specified rate */
+	hrt_call_after(&_call, 1000, (hrt_callout)&SERVO12C_TEST::_test_trampoline, this);
 
 	warnx("[servo12c_test] starting\n");
 
@@ -252,7 +268,7 @@ SERVO12C_TEST::servo12c_test_thread_main() {
 
 	if (thread_should_run) {
 		/* start calling the thread at the specified rate */
-		hrt_call_after(&_call, 200000, (hrt_callout)&SERVO12C_TEST::_test_trampoline, this);
+		hrt_call_after(&_call, 500000, (hrt_callout)&SERVO12C_TEST::_test_trampoline, this);
 	}
 
 	return 0;
