@@ -718,14 +718,22 @@ l_range_finder(const struct listener *l)
 	uint16_t distance[6];
 
 	orb_copy(ORB_ID(multsens_range_finder), mavlink_subs.range_finder, &range_finder);
-
+/*
 	for (i=0; i<6; i++) {
 		distance[i] = cm_uint16_from_m_float(range_finder.distance[i]);
 	}
 
 	mavlink_msg_range_finder_send(MAVLINK_COMM_0,
 									distance, range_finder.valid,
-									range_finder.sensor_start, range_finder.sensor_end);
+									range_finder.sensor_start, range_finder.sensor_end); */
+	mavlink_msg_gps_raw_int_send(MAVLINK_COMM_0,
+			range_finder.timestamp, 0,
+			(int32_t) cm_uint16_from_m_float(range_finder.distance[0]),
+			(int32_t) cm_uint16_from_m_float(range_finder.distance[1]),
+			(int32_t) cm_uint16_from_m_float(range_finder.distance[2]),
+			cm_uint16_from_m_float(range_finder.distance[3]),
+			cm_uint16_from_m_float(range_finder.distance[4]),
+			cm_uint16_from_m_float(range_finder.distance[5]), 0, 0);
 }
 
 static void *
@@ -878,6 +886,10 @@ uorb_receive_start(void)
 	mavlink_subs.navigation_capabilities_sub = orb_subscribe(ORB_ID(navigation_capabilities));
 	orb_set_interval(mavlink_subs.navigation_capabilities_sub, 500); 	/* 2Hz updates */
 	nav_cap.turn_distance = 0.0f;
+
+	/* --- SONAR SENSORS --- */
+	mavlink_subs.range_finder = orb_subscribe(ORB_ID(multsens_range_finder));
+	orb_set_interval(mavlink_subs.range_finder, 60);
 
 	/* start the listener loop */
 	pthread_attr_t uorb_attr;

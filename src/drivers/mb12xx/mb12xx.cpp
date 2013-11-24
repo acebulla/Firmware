@@ -131,7 +131,7 @@ private:
 	uint8_t				_sensor_end;	// Number of the last sensor in the group.
 	int					_measure_ticks;
 	bool				_collect_phase;
-	
+	struct range_finder_multsens_report _report;
 	orb_advert_t		_range_finder_topic;
 
 	perf_counter_t		_sample_perf;
@@ -506,13 +506,13 @@ MB12XX::collect()
 {
 	int	ret = -EIO;
 	uint8_t i;
-	struct range_finder_multsens_report report;
+
 
 	perf_begin(_sample_perf);
 	
 	/* read from the sensor */
 	uint8_t val[2] = {0, 0};
-	report.sensor_start = _sensor_start;
+	_report.sensor_start = _sensor_start;
 	i = _sensor_start;
 
 	while (i <= _sensor_end) {
@@ -531,26 +531,26 @@ MB12XX::collect()
 		uint16_t distance = val[0] << 8 | val[1];
 		float si_units = (distance * 1.0f)/ 100.0f; /* cm to m */
 
-		report.distance[i] = si_units;
-		report.valid[i] = si_units > get_minimum_distance() && si_units < get_maximum_distance() ? 1 : 0;
+		_report.distance[i] = si_units;
+		_report.valid[i] = si_units > get_minimum_distance() && si_units < get_maximum_distance() ? 1 : 0;
 		i++;
 	}
 	
-	report.sensor_end = i-1;
+	_report.sensor_end = i-1;
 	_sensor_start = (i < _sensor_count) ? i : 0;
 	
 	/* This should be fairly close to the end of the measurement, so the best approximation of the time.
 	 * We record the time after all sensors in the group have been measured.
 	 * */
-	report.timestamp = hrt_absolute_time();
+	_report.timestamp = hrt_absolute_time();
 	//log("%u", report.timestamp);
 
 
 	
 	/* publish it */
-	orb_publish(ORB_ID(multsens_range_finder), _range_finder_topic, &report);
+	orb_publish(ORB_ID(multsens_range_finder), _range_finder_topic, &_report);
 
-	if (_reports->force(&report)) {
+	if (_reports->force(&_report)) {
 		perf_count(_buffer_overflows);
 	}
 
