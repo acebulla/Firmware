@@ -97,6 +97,7 @@ const servo_position_f SERVO_MIN_RAD[SERVOS_ATTACHED] = {0, 0};
 struct servo_control_values {
 	/** desired pulse widths for each of the supported channels */
 	servo_position_f	values[SERVOS_ATTACHED];
+	float				speed[SERVOS_ATTACHED];
 	uint8_t				set_value[SERVOS_ATTACHED];
 };
 

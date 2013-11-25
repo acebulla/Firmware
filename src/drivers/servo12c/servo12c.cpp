@@ -69,6 +69,7 @@
 
 #include <uORB/uORB.h>
 #include <uORB/topics/subsystem_info.h>
+#include <uORB/topics/debug_key_value.h>
 
 #include <board_config.h>
 
@@ -135,7 +136,12 @@ private:
 	int					_servo_control_topic;
 	servo_control_values	_controls;
 
+	uint8_t msg[SERVOS_ATTACHED+1];
+	uint8_t * val;
+	uint8_t target[SERVOS_ATTACHED];
+	uint8_t speed[SERVOS_ATTACHED];
 
+	hrt_abstime timestamp;
 
 
 	perf_counter_t		_sample_perf;
@@ -204,8 +210,13 @@ SERVO12C::SERVO12C(int bus, uint8_t address) :
 	// enable debug() calls
 	_debug_enabled = true;
 
+	val = &msg[1];
 
+	timestamp = 0;
 
+	memset(msg, 0, sizeof(msg));
+	memset(target, 127, sizeof(msg));
+	memset(speed, 5, sizeof(msg));
 	memset(_current_values, 127, sizeof(_controls));
 }
 
@@ -255,7 +266,7 @@ SERVO12C::init()
 	/* start the HIL interface task */
 	_task = task_spawn_cmd("servo12c",
 			   SCHED_DEFAULT,
-			   SCHED_PRIORITY_DEFAULT,
+			   SCHED_PRIORITY_MAX - 35,
 			   2048,
 			   (main_t)&SERVO12C::task_cycle_trampoline,
 			   nullptr);
@@ -277,7 +288,6 @@ SERVO12C::probe()
 
 	int ret,i ;
 
-	uint8_t msg[SERVOS_ATTACHED + 1];
 	msg[0] = 0;
 	for (i = 1; i <= SERVOS_ATTACHED; i++)
 	{
@@ -406,26 +416,8 @@ SERVO12C::read(struct file *filp, char *buffer, size_t buflen)
 int
 SERVO12C::set_servo_values()
 {
-	uint8_t msg[SERVOS_ATTACHED+1] = {0, 10, 127};
-	uint8_t * val = &msg[1];
-	int ret;
 	uint8_t i;
-
-	/* Start at the first servo (port SERVO0) */
-	msg[0] = 0;
-
-	/* For every servo, if the value must be adjusted then convert it and store it in the msg array,
-	 * otherwise use the old value.
-	 */
-	for (i = 0; i < SERVOS_ATTACHED; i++) {
-		//printf("i = %d, Set value = %d, value = %f \n", i, _controls.set_value[i], _controls.values[i]);
-		val[i] = _controls.set_value[i] ? convert(_controls.values[i], i) : _current_values[i];
-		//printf("val = %d \n", val[i]);
-	}
-
-//	for (i=0; i<SERVOS_ATTACHED+1; i++){
-//		printf("msg[%d] = %d \n", i, msg[i]);
-//	}
+	int ret;
 
 	/*
 	 * Send the command to adjust the servo positions.
@@ -521,12 +513,14 @@ SERVO12C::task_cycle()
 
 	/* loop until killed */
 	while (!_task_exit) {
-
-		//printf("test");
-
+		uint8_t i;
+		int diff;
+		if (timestamp == 0) {
+			hrt_store_absolute_time(&timestamp);
+		}
 
 		/* sleep waiting for data, but no more than a second */
-		int ret = ::poll(&fds[0], 1, 1000);
+		int ret = ::poll(&fds[0], 1, 0);
 
 		/* this would be bad... */
 		if (ret < 0) {
@@ -537,12 +531,39 @@ SERVO12C::task_cycle()
 		/* do we have a control update? */
 		if (fds[0].revents & POLLIN) {
 
+
 			/* get controls - must always do this to avoid spinning */
 			orb_copy(ORB_ID(servo12c_control), _servo_control_topic, &_controls);
 
-			set_servo_values();
+			/* For every servo, if the value must be adjusted then convert it and store it in the msg array,
+			 * otherwise use the old value.
+			 */
+			for (i = 0; i < SERVOS_ATTACHED; i++) {
+				target[i] = _controls.set_value[i] ? convert(_controls.values[i], i) : _current_values[i];
+				speed[i] = 10; //convert(_controls.speed[i], i);
+			}
 
 		}
+
+		for (i = 0; i < SERVOS_ATTACHED; i++) {
+			diff = (int)target[i] - (int)_current_values[i];
+			if (abs(diff) < speed[i]) {
+				val[i] = target[i];
+			} else {
+				val[i] = (diff > 0) ? _current_values[i] + speed[i] : _current_values[i] - speed[i];
+			}
+		}
+		set_servo_values();
+
+		if(hrt_elapsed_time(&timestamp) > 10000) {
+			log("%llu", hrt_elapsed_time(&timestamp));
+		}
+
+		while(hrt_elapsed_time(&timestamp) < 10000) {
+			usleep(1000);
+		}
+
+		timestamp += 10000;
 
 	}
 
