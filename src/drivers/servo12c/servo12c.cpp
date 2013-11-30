@@ -540,7 +540,8 @@ SERVO12C::task_cycle()
 			 */
 			for (i = 0; i < SERVOS_ATTACHED; i++) {
 				target[i] = _controls.set_value[i] ? convert(_controls.values[i], i) : _current_values[i];
-				speed[i] = 10; //convert(_controls.speed[i], i);
+				// speed is in _input_type / s want _input_type / 0.01 s
+				speed[i] = convert(_controls.speed[i] / 100.0f, i);
 			}
 
 		}

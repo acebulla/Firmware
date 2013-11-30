@@ -93,7 +93,7 @@ private:
 	struct hrt_call		_call;
 
 	Input_type	_input_type;
-	float _value[SERVOS_ATTACHED]; bool _new_val;
+	float _value[2*SERVOS_ATTACHED]; bool _new_val;
 	bool _manual;
 	bool _left;
 	bool thread_should_run;
@@ -225,7 +225,7 @@ SERVO12C_TEST::set_values(float values[], char * inputType)
 		_input_type = RAD;
 	}
 
-	for (i = 0; i < SERVOS_ATTACHED; i++)
+	for (i = 0; i < 2*SERVOS_ATTACHED; i++)
 	{
 		_value[i] = values[i];
 	}
@@ -242,15 +242,18 @@ fail:
 
 int
 SERVO12C_TEST::servo12c_test_thread_main() {
-	uint8_t i;
+	uint8_t i, j;
 	if (_manual)
 	{
 		if (_new_val)
 		{
-			for (i = 0; i < SERVOS_ATTACHED; i++)
+			j = 0;
+			for (i = 0; i < 2*SERVOS_ATTACHED; i+=2)
 			{
-				servcon.values[i] = _value[i];
-				servcon.set_value[i] = 1;
+				servcon.values[j] = _value[i];
+				servcon.speed[j] = _value[i+1];
+				servcon.set_value[j] = 1;
+				j++;
 			}
 			_new_val = false;
 		}
@@ -369,9 +372,9 @@ servo12c_test_main(int argc, char *argv[])
 	if (!strcmp(argv[1], "ABS") || !strcmp(argv[1], "DEG") || !strcmp(argv[1], "RAD"))
 	{
 		uint8_t i;
-		float values[SERVOS_ATTACHED];
+		float values[2*SERVOS_ATTACHED];
 
-		for (i = 2; i < SERVOS_ATTACHED + 2; i++)
+		for (i = 2; i < 2*SERVOS_ATTACHED + 2; i++)
 		{
 			values[i-2] = (float) atof(argv[i]);
 		}
