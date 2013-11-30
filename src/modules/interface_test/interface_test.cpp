@@ -1,7 +1,7 @@
 /****************************************************************************
  *
  *   Copyright (C) 2012 PX4 Development Team. All rights reserved.
- *   Author: Lorenz Meier <lm@inf.ethz.ch>
+ *   Author: @author Example User <mail@example.com>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,52 +33,67 @@
  ****************************************************************************/
 
 /**
- * @file mavlink_bridge_header
- * MAVLink bridge header for UART access.
- *
- * @author Lorenz Meier <lm@inf.ethz.ch>
+ * @file interTes.c
+ * Testing argument passing to applications.
  */
 
-/* MAVLink adapter header */
-#ifndef MAVLINK_BRIDGE_HEADER_H
-#define MAVLINK_BRIDGE_HEADER_H
+#include <nuttx/config.h>
+#include <string.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <errno.h>
 
-#define MAVLINK_USE_CONVENIENCE_FUNCTIONS
+#define MAX_ADDR_COUNT 127 /* Maximum number of different sensor addresses */
+#define GROUPEND 0x80 /* Bitmask indicating the end of an address group */
+#define ADDRPART 0x7F /* Bitmask for extracting the address part */
 
-/* use efficient approach, see mavlink_helpers.h */
-#define MAVLINK_SEND_UART_BYTES mavlink_send_uart_bytes
+/*
+class INTERFACE_TEST
+{
+public:
+	interface_test_main(int bus, spi_dev_e device);
+}
+*/
 
-#define MAVLINK_GET_CHANNEL_BUFFER mavlink_get_channel_buffer
-#define MAVLINK_GET_CHANNEL_STATUS mavlink_get_channel_status
-
-#include <v1.0/mavlink_types.h>
-#include <unistd.h>
+/** driver 'main' command */
+extern "C" { __EXPORT int interface_test_main(int argc, char *argv[]); }
 
 
-/* Struct that stores the communication settings of this system.
-   you can also define / alter these settings elsewhere, as long
-   as they're included BEFORE mavlink.h.
-   So you can set the
+int interface_test_main(int argc, char *argv[])
+{
+	int i;
+	uint8_t addri = 0, addrcount = 0;
+	uint8_t * addr;
 
-   mavlink_system.sysid = 100; // System ID, 1-255
-   mavlink_system.compid = 50; // Component/Subsystem ID, 1-255
+	if (argc > 3 && (strcmp(argv[2], "-a") == 0 || strcmp(argv[2], "--addrgroups") == 0)) {
+		addrcount = atoi(argv[3]);
+		printf("addrcount: %d\n", addrcount);
+		if (addrcount <= MAX_ADDR_COUNT) {
+			addr = new uint8_t[addrcount];
+			for (i = 4; i < argc; i++) {
+				if (strcmp(argv[i], ",") == 0) {
+					addr[addri-1] |= GROUPEND;
+					printf("%X \n", addr[addri-1]);
+					continue;
+				}
 
-   Lines also in your main.c, e.g. by reading these parameter from EEPROM.
- */
-extern mavlink_system_t mavlink_system;
+				addr[addri] = (uint8_t) atoi(argv[i]);
+				printf("addri: %d\t addr: %d \n", addri, addr[addri]);
+				addri++;
+			}
 
-/**
- * @brief Send multiple chars (uint8_t) over a comm channel
- *
- * @param chan MAVLink channel to use, usually MAVLINK_COMM_0 = UART0
- * @param ch Character to send
- */
-extern void mavlink_send_uart_bytes(mavlink_channel_t chan, const uint8_t *ch, int length);
+			/* Last address must be the end of a group in any case. */
+			addr[addri-1] |= GROUPEND;
+		}
+	}
 
-extern mavlink_status_t *mavlink_get_channel_status(uint8_t chan);
-extern mavlink_message_t *mavlink_get_channel_buffer(uint8_t chan);
+	for (i = 0; i < addrcount; i++) {
+		printf("%d", (addr[i] & ADDRPART));
+		if (addr[i] & GROUPEND) {
+			printf("\n");
+		}
+	}
 
-#include <v1.0/common/mavlink.h>
-//#include <v1.0/sonarsensors/mavlink.h>
-
-#endif /* MAVLINK_BRIDGE_HEADER_H */
+	return OK;
+}

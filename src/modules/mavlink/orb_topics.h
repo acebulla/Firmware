@@ -69,6 +69,9 @@
 #include <drivers/drv_rc_input.h>
 #include <uORB/topics/navigation_capabilities.h>
 
+// Ultrasonic sensors:
+#include <drivers/drv_range_finder_multsens.h>
+
 struct mavlink_subscriptions {
 	int sensor_sub;
 	int att_sub;
@@ -94,6 +97,7 @@ struct mavlink_subscriptions {
 	int home_sub;
 	int airspeed_sub;
 	int navigation_capabilities_sub;
+	int range_finder;
 };
 
 extern struct mavlink_subscriptions mavlink_subs;

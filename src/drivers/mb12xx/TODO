@@ -1,0 +1,15 @@
+Maybe create new drv_range_finder.h
+-> drv_range_finder_multsens.h
+
+Change struct range_finder_report:
+array of size MAX_ADDR_COUNT float[] distance, uint8_t[] valid
+start_sensor
+end_sensor
+
+Interface from interface_test to mb12xx
+Handling of groups
+
+Address array is read in and passed to constructor
+TODO
+Take care of accesses to struct range_finder_multsens_report (eg. test function)
+Take care of measure and collect 

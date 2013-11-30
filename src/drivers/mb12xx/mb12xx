@@ -1,0 +1,52 @@
+nsh> mb12xx start
+[MB12xx] on I2C bus 3 at 0x70
+nsh> mb12xx info
+state @ 10005ba0
+mb12xx_read: 185 events, 86320us elapsed, min 400us max 1744us
+mb12xx_comms_errors: 1 events
+mb12xx_buffer_overflows: 183 events
+poll interval:  60 ticks
+report queue	2/32 (0/2 @ 1000e040)
+nsh> mb12xx
+mb12xx: unrecognized command, try 'start', 'test', 'reset' or 'info'
+nsh> mb12xx test
+mb12xx: single read
+mb12xx: measurement: 0.20 m
+mb12xx: time:        51508676
+mb12xx: periodic read 0
+mb12xx: measurement: 0.200
+mb12xx: time:        51635125
+mb12xx: periodic read 1
+mb12xx: measurement: 0.200
+mb12xx: time:        51701066
+mb12xx: periodic read 2
+mb12xx: measurement: 0.200
+mb12xx: time:        52208428
+mb12xx: periodic read 3
+mb12xx: measurement: 0.200
+mb12xx: time:        52715482
+mb12xx: periodic read 4
+mb12xx: measurement: 0.200
+mb12xx: time:        53222401
+mb12xx: PASS
+nsh> mb12xx test
+mb12xx: single read
+mb12xx: measurement: 1.03 m
+mb12xx: time:        65410746
+mb12xx: periodic read 0
+mb12xx: measurement: 1.030
+mb12xx: time:        65923760
+mb12xx: periodic read 1
+mb12xx: measurement: 1.030
+mb12xx: time:        66441073
+mb12xx: periodic read 2
+mb12xx: measurement: 1.030
+mb12xx: time:        66946062
+mb12xx: periodic read 3
+mb12xx: measurement: 1.030
+mb12xx: time:        67452675
+mb12xx: periodic read 4
+mb12xx: measurement: 1.030
+mb12xx: time:        67960648
+mb12xx: PASS
+

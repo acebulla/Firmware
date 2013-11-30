@@ -39,6 +39,8 @@ MODULES		+= drivers/ets_airspeed
 MODULES		+= drivers/meas_airspeed
 MODULES		+= modules/sensors
 
+MODULES		+= drivers/servo12c
+
 #
 # System commands
 #
@@ -120,6 +122,8 @@ MODULES		+= lib/conversion
 #
 # Demo apps
 #
+MODULES         += modules/interface_test
+MODULES         += modules/servo12c_test
 #MODULES		+= examples/math_demo
 # Tutorial code from
 # https://pixhawk.ethz.ch/px4/dev/hello_sky
