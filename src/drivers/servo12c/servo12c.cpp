@@ -222,9 +222,9 @@ SERVO12C::SERVO12C(int bus, uint8_t address) :
 	_timestamp = 0;
 
 	memset(_msg, 0, sizeof(_msg));
-	memset(_target, 127, sizeof(_msg));
-	memset(_speed, 5, sizeof(_msg));
-	memset(_current_values, 127, sizeof(_controls));
+	memset(_target, 127, sizeof(_target));
+	memset(_speed, 5, sizeof(_speed));
+	memset(_current_values, 127, sizeof(_current_values));
 }
 
 SERVO12C::~SERVO12C()
@@ -256,7 +256,6 @@ int
 SERVO12C::init()
 {
 	int ret = OK;
-	struct servo_param_handles param_handles;
 
 	/* do I2C init (and probe) first */
 	if (I2C::init() != OK) {
@@ -270,10 +269,6 @@ SERVO12C::init()
 
 	/* sensor is ok, but we don't really know if it is within range */
 	_sensor_ok = true;
-
-	/* get parameters of the servo calibration */
-	parameters_init(param_handles);
-	parameters_update(param_handles, _calibration_values);
 
 	/* start the HIL interface task */
 	_task = task_spawn_cmd("servo12c",
@@ -457,7 +452,13 @@ SERVO12C::convert(float conv, uint8_t servo)
 {
 	uint8_t ret;
 
-
+//	log("SERVO_P1_ABS: %f \n", _calibration_values.SERVO_P1_ABS[0]);
+//	log("SERVO_P1_DEG: %f \n", _calibration_values.SERVO_P1_DEG[0]);
+//	log("SERVO_P1_RAD: %f \n", _calibration_values.SERVO_P1_RAD[0]);
+//
+//	log("SERVO_P2_ABS: %f \n", _calibration_values.SERVO_P2_ABS[0]);
+//	log("SERVO_P2_DEG: %f \n", _calibration_values.SERVO_P2_DEG[0]);
+//	log("SERVO_P2_RAD: %f \n", _calibration_values.SERVO_P2_RAD[0]);
 
 	switch (_input_type) {
 
@@ -466,7 +467,7 @@ SERVO12C::convert(float conv, uint8_t servo)
 			ret = (uint8_t) conv;
 			//printf("[SERVO12C] conv: %f \n", conv);
 			//printf("[SERVO12C] ret: %d \n", ret);
-			break;
+			return ret;
 
 
 		case DEG:
@@ -548,6 +549,14 @@ int SERVO12C::parameters_update(const struct servo_param_handles h, struct servo
 	param_get(h.tilt_p2_DEG, &(p.SERVO_P2_DEG[1]));
 	param_get(h.tilt_p2_RAD, &(p.SERVO_P2_RAD[1]));
 
+	log("SERVO_P1_ABS: %f \n", _calibration_values.SERVO_P1_ABS[0]);
+	log("SERVO_P1_DEG: %f \n", _calibration_values.SERVO_P1_DEG[0]);
+	log("SERVO_P1_RAD: %f \n", _calibration_values.SERVO_P1_RAD[0]);
+
+	log("SERVO_P2_ABS: %f \n", _calibration_values.SERVO_P2_ABS[0]);
+	log("SERVO_P2_DEG: %f \n", _calibration_values.SERVO_P2_DEG[0]);
+	log("SERVO_P2_RAD: %f \n", _calibration_values.SERVO_P2_RAD[0]);
+
 	return OK;
 }
 
@@ -561,6 +570,12 @@ SERVO12C::task_cycle_trampoline(int argc, char *argv[])
 void
 SERVO12C::task_cycle()
 {
+	struct servo_param_handles param_handles;
+
+	/* get parameters of the servo calibration */
+	parameters_init(param_handles);
+	parameters_update(param_handles, _calibration_values);
+
 	/* Subscribe to the servo12c_control topic */
 	_servo_control_topic = orb_subscribe(ORB_ID(servo12c_control));
 
@@ -604,6 +619,8 @@ SERVO12C::task_cycle()
 				_speed[i] = 6; //convert(_controls.speed[i] / 100.0f, i);
 			}
 
+			log("target: %d, speed: %d \n", _target[0], _speed[0]);
+
 		}
 
 		for (i = 0; i < SERVOS_ATTACHED; i++) {
@@ -617,7 +634,7 @@ SERVO12C::task_cycle()
 		set_servo_values();
 
 		if(hrt_elapsed_time(&_timestamp) > 10000) {
-			log("%llu", hrt_elapsed_time(&_timestamp));
+			//log("%llu", hrt_elapsed_time(&_timestamp));
 		}
 
 		while(hrt_elapsed_time(&_timestamp) < 10000) {
