@@ -37,4 +37,5 @@
 
 MODULE_COMMAND	= servo12c
 
-SRCS		= servo12c.cpp
+SRCS		= servo12c.cpp \
+				servo12c_params.c
