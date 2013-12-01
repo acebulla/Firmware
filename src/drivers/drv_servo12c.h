@@ -48,6 +48,7 @@
 #include <math.h>
 
 #include "drv_orb_dev.h"
+#include <systemlib/param/param.h>
 
 __BEGIN_DECLS
 
@@ -85,6 +86,38 @@ const servo_position_f SERVO_MAX_RAD[SERVOS_ATTACHED] = {PI, PI};
 const servo_position_f SERVO_MIN_ABS[SERVOS_ATTACHED] = {0, 0};
 const servo_position_f SERVO_MIN_DEG[SERVOS_ATTACHED] = {0, 0};
 const servo_position_f SERVO_MIN_RAD[SERVOS_ATTACHED] = {0, 0};
+
+/** Two points measured to calibrate the servos.
+ *  Used to convert from DEG or RAD to ABS values.
+ */
+
+struct servo_calibration_values {
+	servo_position_f SERVO_P1_ABS[SERVOS_ATTACHED];
+	servo_position_f SERVO_P1_DEG[SERVOS_ATTACHED];
+	servo_position_f SERVO_P1_RAD[SERVOS_ATTACHED];
+
+	servo_position_f SERVO_P2_ABS[SERVOS_ATTACHED];
+	servo_position_f SERVO_P2_DEG[SERVOS_ATTACHED];
+	servo_position_f SERVO_P2_RAD[SERVOS_ATTACHED];
+};
+
+struct servo_param_handles {
+	param_t pan_p1_ABS;
+	param_t pan_p1_DEG;
+	param_t pan_p1_RAD;
+
+	param_t pan_p2_ABS;
+	param_t pan_p2_DEG;
+	param_t pan_p2_RAD;
+
+	param_t tilt_p1_ABS;
+	param_t tilt_p1_DEG;
+	param_t tilt_p1_RAD;
+
+	param_t tilt_p2_ABS;
+	param_t tilt_p2_DEG;
+	param_t tilt_p2_RAD;
+};
 
 /**
  * Servo output structure.

@@ -71,6 +71,8 @@
 #include <uORB/topics/subsystem_info.h>
 #include <uORB/topics/debug_key_value.h>
 
+
+
 #include <board_config.h>
 
 /* Configuration Constants */
@@ -133,15 +135,17 @@ private:
 	uint8_t				_current_values[SERVOS_ATTACHED];
 	float				_conversion_values[SERVOS_ATTACHED];
 
+	struct servo_calibration_values _calibration_values;
+
 	int					_servo_control_topic;
-	servo_control_values	_controls;
+	struct servo_control_values	_controls;
 
-	uint8_t msg[SERVOS_ATTACHED+1];
-	uint8_t * val;
-	uint8_t target[SERVOS_ATTACHED];
-	uint8_t speed[SERVOS_ATTACHED];
+	uint8_t _msg[SERVOS_ATTACHED+1];
+	uint8_t * _val;
+	uint8_t _target[SERVOS_ATTACHED];
+	uint8_t _speed[SERVOS_ATTACHED];
 
-	hrt_abstime timestamp;
+	hrt_abstime _timestamp;
 
 
 	perf_counter_t		_sample_perf;
@@ -177,6 +181,9 @@ private:
 
 	uint8_t				convert(float conv, uint8_t servo);
 
+	int parameters_init(struct servo_param_handles h);
+	int parameters_update(const struct servo_param_handles h, struct servo_calibration_values p);
+
 
 	static void	task_cycle_trampoline(int argc, char *argv[]);
 	void		task_cycle() __attribute__((noreturn));
@@ -210,13 +217,13 @@ SERVO12C::SERVO12C(int bus, uint8_t address) :
 	// enable debug() calls
 	_debug_enabled = true;
 
-	val = &msg[1];
+	_val = &_msg[1];
 
-	timestamp = 0;
+	_timestamp = 0;
 
-	memset(msg, 0, sizeof(msg));
-	memset(target, 127, sizeof(msg));
-	memset(speed, 5, sizeof(msg));
+	memset(_msg, 0, sizeof(_msg));
+	memset(_target, 127, sizeof(_msg));
+	memset(_speed, 5, sizeof(_msg));
 	memset(_current_values, 127, sizeof(_controls));
 }
 
@@ -249,6 +256,7 @@ int
 SERVO12C::init()
 {
 	int ret = OK;
+	struct servo_param_handles param_handles;
 
 	/* do I2C init (and probe) first */
 	if (I2C::init() != OK) {
@@ -262,6 +270,10 @@ SERVO12C::init()
 
 	/* sensor is ok, but we don't really know if it is within range */
 	_sensor_ok = true;
+
+	/* get parameters of the servo calibration */
+	parameters_init(param_handles);
+	parameters_update(param_handles, _calibration_values);
 
 	/* start the HIL interface task */
 	_task = task_spawn_cmd("servo12c",
@@ -288,15 +300,15 @@ SERVO12C::probe()
 
 	int ret,i ;
 
-	msg[0] = 0;
+	_msg[0] = 0;
 	for (i = 1; i <= SERVOS_ATTACHED; i++)
 	{
-		msg[i] = 10;
+		_msg[i] = 10;
 	}
 
 	//printf("sizeof(msg) = %d\n", sizeof(msg));
 
-	ret = transfer(msg, sizeof(msg), nullptr, 0);
+	ret = transfer(_msg, sizeof(_msg), nullptr, 0);
 
 
 
@@ -322,7 +334,8 @@ SERVO12C::ioctl(struct file *filp, int cmd, unsigned long arg)
 				case SERVO_INPUT_DEG:
 					_input_type = DEG;
 					for (i = 0; i < SERVOS_ATTACHED; i++) {
-						_conversion_values[i] = (SERVO_MAX_ABS[i] - SERVO_MIN_ABS[i]) / (SERVO_MAX_DEG[i] - SERVO_MIN_DEG[i]);
+						_conversion_values[i] = (_calibration_values.SERVO_P2_ABS[i] - _calibration_values.SERVO_P1_ABS[i])
+								/ (_calibration_values.SERVO_P2_DEG[i] - _calibration_values.SERVO_P1_DEG[i]);
 					}
 					return OK;
 
@@ -330,7 +343,8 @@ SERVO12C::ioctl(struct file *filp, int cmd, unsigned long arg)
 				case SERVO_INPUT_RAD:
 					_input_type = RAD;
 					for (i = 0; i < SERVOS_ATTACHED; i++) {
-						_conversion_values[i] = (SERVO_MAX_ABS[i] - SERVO_MIN_ABS[i]) / (SERVO_MAX_RAD[i] - SERVO_MIN_RAD[i]);
+						_conversion_values[i] = (_calibration_values.SERVO_P2_ABS[i] - _calibration_values.SERVO_P1_ABS[i])
+										/ (_calibration_values.SERVO_P2_RAD[i] - _calibration_values.SERVO_P1_RAD[i]);
 					}
 					return OK;
 
@@ -423,7 +437,7 @@ SERVO12C::set_servo_values()
 	 * Send the command to adjust the servo positions.
 	 */
 	//printf("sizeof(msg) = %d\n", sizeof(msg));
-	ret = transfer(msg, sizeof(msg), nullptr, 0);
+	ret = transfer(_msg, sizeof(_msg), nullptr, 0);
 
 	if (OK != ret) {
 		perf_count(_comms_errors);
@@ -431,7 +445,7 @@ SERVO12C::set_servo_values()
 	}
 	else {
 		for (i = 0; i < SERVOS_ATTACHED; i++) {
-			_current_values[i] = val[i];
+			_current_values[i] = _val[i];
 		}
 	}
 
@@ -443,6 +457,8 @@ SERVO12C::convert(float conv, uint8_t servo)
 {
 	uint8_t ret;
 
+
+
 	switch (_input_type) {
 
 
@@ -450,10 +466,11 @@ SERVO12C::convert(float conv, uint8_t servo)
 			ret = (uint8_t) conv;
 			//printf("[SERVO12C] conv: %f \n", conv);
 			//printf("[SERVO12C] ret: %d \n", ret);
-			return ret;
+			break;
 
 
 		case DEG:
+
 			if (conv < SERVO_MIN_DEG[servo]) {
 				return (uint8_t) SERVO_MIN_ABS[servo];
 			}
@@ -461,7 +478,7 @@ SERVO12C::convert(float conv, uint8_t servo)
 				return (uint8_t) SERVO_MAX_ABS[servo];
 			}
 
-			ret = SERVO_MIN_ABS[servo] + _conversion_values[servo] * (conv - SERVO_MIN_DEG[servo]);
+			ret = _calibration_values.SERVO_P1_ABS[servo] + _conversion_values[servo] * (conv - _calibration_values.SERVO_P1_DEG[servo]);
 			ret = (uint8_t) roundf(ret);
 			//printf("[SERVO12C] conv: %f \n", conv);
 			//printf("[SERVO12C] ret: %d \n", ret);
@@ -469,14 +486,15 @@ SERVO12C::convert(float conv, uint8_t servo)
 
 
 		case RAD:
-			if (conv < SERVO_MIN_DEG[servo]) {
+
+			if (conv < SERVO_MIN_RAD[servo]) {
 				return (uint8_t) SERVO_MIN_ABS[servo];
 			}
-			else if (conv > SERVO_MAX_DEG[servo]) {
+			else if (conv > SERVO_MAX_RAD[servo]) {
 				return (uint8_t) SERVO_MAX_ABS[servo];
 			}
 
-			ret = SERVO_MIN_ABS[servo] + _conversion_values[servo] * (conv - SERVO_MIN_RAD[servo]);
+			ret = _calibration_values.SERVO_P1_ABS[servo] + _conversion_values[servo] * (conv - _calibration_values.SERVO_P1_RAD[servo]);
 			ret = (uint8_t) roundf(ret);
 			//printf("[SERVO12C] conv: %f \n", conv);
 			//printf("[SERVO12C] ret: %d \n", ret);
@@ -489,6 +507,48 @@ SERVO12C::convert(float conv, uint8_t servo)
 
 		}
 
+}
+
+int SERVO12C::parameters_init(struct servo_param_handles h)
+{
+	h.pan_p1_ABS = param_find("PAN_P1_ABS");
+	h.pan_p1_DEG = param_find("PAN_P1_DEG");
+	h.pan_p1_RAD = param_find("PAN_P1_RAD");
+
+	h.pan_p2_ABS = param_find("PAN_P2_ABS");
+	h.pan_p2_DEG = param_find("PAN_P2_DEG");
+	h.pan_p2_RAD = param_find("PAN_P2_RAD");
+
+	h.tilt_p1_ABS = param_find("TILT_P1_ABS");
+	h.tilt_p1_DEG = param_find("TILT_P1_DEG");
+	h.tilt_p1_RAD =	param_find("TILT_P1_RAD");
+
+	h.tilt_p2_ABS = param_find("TILT_P2_ABS");
+	h.tilt_p2_DEG = param_find("TILT_P2_DEG");
+	h.tilt_p2_RAD =	param_find("TILT_P2_RAD");
+
+	return OK;
+}
+
+int SERVO12C::parameters_update(const struct servo_param_handles h, struct servo_calibration_values p)
+{
+	param_get(h.pan_p1_ABS, &(p.SERVO_P1_ABS[0]));
+	param_get(h.pan_p1_DEG, &(p.SERVO_P1_DEG[0]));
+	param_get(h.pan_p1_RAD, &(p.SERVO_P1_RAD[0]));
+
+	param_get(h.pan_p2_ABS, &(p.SERVO_P2_ABS[0]));
+	param_get(h.pan_p2_DEG, &(p.SERVO_P2_DEG[0]));
+	param_get(h.pan_p2_RAD, &(p.SERVO_P2_RAD[0]));
+
+	param_get(h.tilt_p1_ABS, &(p.SERVO_P1_ABS[1]));
+	param_get(h.tilt_p1_DEG, &(p.SERVO_P1_DEG[1]));
+	param_get(h.tilt_p1_RAD, &(p.SERVO_P1_RAD[1]));
+
+	param_get(h.tilt_p2_ABS, &(p.SERVO_P2_ABS[1]));
+	param_get(h.tilt_p2_DEG, &(p.SERVO_P2_DEG[1]));
+	param_get(h.tilt_p2_RAD, &(p.SERVO_P2_RAD[1]));
+
+	return OK;
 }
 
 
@@ -515,8 +575,8 @@ SERVO12C::task_cycle()
 	while (!_task_exit) {
 		uint8_t i;
 		int diff;
-		if (timestamp == 0) {
-			hrt_store_absolute_time(&timestamp);
+		if (_timestamp == 0) {
+			hrt_store_absolute_time(&_timestamp);
 		}
 
 		/* sleep waiting for data, but no more than a second */
@@ -539,32 +599,32 @@ SERVO12C::task_cycle()
 			 * otherwise use the old value.
 			 */
 			for (i = 0; i < SERVOS_ATTACHED; i++) {
-				target[i] = _controls.set_value[i] ? convert(_controls.values[i], i) : _current_values[i];
+				_target[i] = _controls.set_value[i] ? convert(_controls.values[i], i) : _current_values[i];
 				// speed is in _input_type / s want _input_type / 0.01 s
-				speed[i] = convert(_controls.speed[i] / 100.0f, i);
+				_speed[i] = 6; //convert(_controls.speed[i] / 100.0f, i);
 			}
 
 		}
 
 		for (i = 0; i < SERVOS_ATTACHED; i++) {
-			diff = (int)target[i] - (int)_current_values[i];
-			if (abs(diff) < speed[i]) {
-				val[i] = target[i];
+			diff = (int)_target[i] - (int)_current_values[i];
+			if (abs(diff) < _speed[i]) {
+				_val[i] = _target[i];
 			} else {
-				val[i] = (diff > 0) ? _current_values[i] + speed[i] : _current_values[i] - speed[i];
+				_val[i] = (diff > 0) ? _current_values[i] + _speed[i] : _current_values[i] - _speed[i];
 			}
 		}
 		set_servo_values();
 
-		if(hrt_elapsed_time(&timestamp) > 10000) {
-			log("%llu", hrt_elapsed_time(&timestamp));
+		if(hrt_elapsed_time(&_timestamp) > 10000) {
+			log("%llu", hrt_elapsed_time(&_timestamp));
 		}
 
-		while(hrt_elapsed_time(&timestamp) < 10000) {
+		while(hrt_elapsed_time(&_timestamp) < 10000) {
 			usleep(1000);
 		}
 
-		timestamp += 10000;
+		_timestamp += 10000;
 
 	}
 
