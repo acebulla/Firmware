@@ -181,8 +181,8 @@ private:
 
 	uint8_t				convert(float conv, uint8_t servo);
 
-	int parameters_init(struct servo_param_handles h);
-	int parameters_update(const struct servo_param_handles h, struct servo_calibration_values p);
+	int parameters_init(struct servo_param_handles& h);
+	int parameters_update(const struct servo_param_handles& h, struct servo_calibration_values& p);
 
 
 	static void	task_cycle_trampoline(int argc, char *argv[]);
@@ -510,7 +510,7 @@ SERVO12C::convert(float conv, uint8_t servo)
 
 }
 
-int SERVO12C::parameters_init(struct servo_param_handles h)
+int SERVO12C::parameters_init(struct servo_param_handles& h)
 {
 	h.pan_p1_ABS = param_find("PAN_P1_ABS");
 	h.pan_p1_DEG = param_find("PAN_P1_DEG");
@@ -528,10 +528,12 @@ int SERVO12C::parameters_init(struct servo_param_handles h)
 	h.tilt_p2_DEG = param_find("TILT_P2_DEG");
 	h.tilt_p2_RAD =	param_find("TILT_P2_RAD");
 
+//	log("PAN_P1_ABS: %u \n", h.pan_p1_ABS);
+
 	return OK;
 }
 
-int SERVO12C::parameters_update(const struct servo_param_handles h, struct servo_calibration_values p)
+int SERVO12C::parameters_update(const struct servo_param_handles& h, struct servo_calibration_values& p)
 {
 	param_get(h.pan_p1_ABS, &(p.SERVO_P1_ABS[0]));
 	param_get(h.pan_p1_DEG, &(p.SERVO_P1_DEG[0]));
@@ -549,13 +551,15 @@ int SERVO12C::parameters_update(const struct servo_param_handles h, struct servo
 	param_get(h.tilt_p2_DEG, &(p.SERVO_P2_DEG[1]));
 	param_get(h.tilt_p2_RAD, &(p.SERVO_P2_RAD[1]));
 
-	log("SERVO_P1_ABS: %f \n", _calibration_values.SERVO_P1_ABS[0]);
-	log("SERVO_P1_DEG: %f \n", _calibration_values.SERVO_P1_DEG[0]);
-	log("SERVO_P1_RAD: %f \n", _calibration_values.SERVO_P1_RAD[0]);
+//	log("PAN_P1_ABS: %u \n", h.pan_p1_ABS);
 
-	log("SERVO_P2_ABS: %f \n", _calibration_values.SERVO_P2_ABS[0]);
-	log("SERVO_P2_DEG: %f \n", _calibration_values.SERVO_P2_DEG[0]);
-	log("SERVO_P2_RAD: %f \n", _calibration_values.SERVO_P2_RAD[0]);
+//	log("SERVO_P1_ABS: %f \n", _calibration_values.SERVO_P1_ABS[0]);
+//	log("SERVO_P1_DEG: %f \n", _calibration_values.SERVO_P1_DEG[0]);
+//	log("SERVO_P1_RAD: %f \n", _calibration_values.SERVO_P1_RAD[0]);
+//
+//	log("SERVO_P2_ABS: %f \n", _calibration_values.SERVO_P2_ABS[0]);
+//	log("SERVO_P2_DEG: %f \n", _calibration_values.SERVO_P2_DEG[0]);
+//	log("SERVO_P2_RAD: %f \n", _calibration_values.SERVO_P2_RAD[0]);
 
 	return OK;
 }
@@ -574,7 +578,7 @@ SERVO12C::task_cycle()
 
 	/* get parameters of the servo calibration */
 	parameters_init(param_handles);
-	parameters_update(param_handles, _calibration_values);
+
 
 	/* Subscribe to the servo12c_control topic */
 	_servo_control_topic = orb_subscribe(ORB_ID(servo12c_control));
@@ -606,6 +610,8 @@ SERVO12C::task_cycle()
 		/* do we have a control update? */
 		if (fds[0].revents & POLLIN) {
 
+			parameters_update(param_handles, _calibration_values);
+
 
 			/* get controls - must always do this to avoid spinning */
 			orb_copy(ORB_ID(servo12c_control), _servo_control_topic, &_controls);
@@ -616,10 +622,10 @@ SERVO12C::task_cycle()
 			for (i = 0; i < SERVOS_ATTACHED; i++) {
 				_target[i] = _controls.set_value[i] ? convert(_controls.values[i], i) : _current_values[i];
 				// speed is in _input_type / s want _input_type / 0.01 s
-				_speed[i] = 6; //convert(_controls.speed[i] / 100.0f, i);
+				_speed[i] = convert(_controls.speed[i] / 100.0f, i);
 			}
 
-			log("target: %d, speed: %d \n", _target[0], _speed[0]);
+			// log("target: %d, speed: %d \n", _target[0], _speed[0]);
 
 		}
 
