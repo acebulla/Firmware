@@ -133,7 +133,9 @@ private:
 	bool				_sensor_ok;
 
 	uint8_t				_current_values[SERVOS_ATTACHED];
+	float				_current_speed[SERVOS_ATTACHED];
 	float				_conversion_values[SERVOS_ATTACHED];
+
 
 	struct servo_calibration_values _calibration_values;
 
@@ -143,7 +145,8 @@ private:
 	uint8_t _msg[SERVOS_ATTACHED+1];
 	uint8_t * _val;
 	uint8_t _target[SERVOS_ATTACHED];
-	uint8_t _speed[SERVOS_ATTACHED];
+	uint8_t _speed[SERVOS_ATTACHED][5];
+	uint8_t	_speed_count[SERVOS_ATTACHED];
 
 	hrt_abstime _timestamp;
 
@@ -180,6 +183,8 @@ private:
 	 */
 
 	uint8_t				convert(float conv, uint8_t servo);
+
+	void				calculate_speed(float speed, uint8_t servo);
 
 	int parameters_init(struct servo_param_handles& h);
 	int parameters_update(const struct servo_param_handles& h, struct servo_calibration_values& p);
@@ -450,27 +455,40 @@ SERVO12C::set_servo_values()
 uint8_t
 SERVO12C::convert(float conv, uint8_t servo)
 {
-	uint8_t ret;
-
-//	log("SERVO_P1_ABS: %f \n", _calibration_values.SERVO_P1_ABS[0]);
-//	log("SERVO_P1_DEG: %f \n", _calibration_values.SERVO_P1_DEG[0]);
-//	log("SERVO_P1_RAD: %f \n", _calibration_values.SERVO_P1_RAD[0]);
-//
-//	log("SERVO_P2_ABS: %f \n", _calibration_values.SERVO_P2_ABS[0]);
-//	log("SERVO_P2_DEG: %f \n", _calibration_values.SERVO_P2_DEG[0]);
-//	log("SERVO_P2_RAD: %f \n", _calibration_values.SERVO_P2_RAD[0]);
+	float ret;
 
 	switch (_input_type) {
 
 
 		case ABS:
-			ret = (uint8_t) conv;
+
+			if (conv < SERVO_MIN_ABS[servo]) {
+					return (uint8_t) SERVO_MIN_ABS[servo];
+			}
+			else if (conv > SERVO_MAX_ABS[servo]) {
+					return (uint8_t) SERVO_MAX_ABS[servo];
+			}
+
+			return (uint8_t) conv;
 			//printf("[SERVO12C] conv: %f \n", conv);
 			//printf("[SERVO12C] ret: %d \n", ret);
-			return ret;
-
 
 		case DEG:
+
+			if (conv < SERVO_MIN_DEG[servo]) {
+				return (uint8_t) SERVO_MIN_ABS[servo];
+			}
+				else if (conv > SERVO_MAX_DEG[servo]) {
+					return (uint8_t) SERVO_MAX_ABS[servo];
+			}
+
+			ret = _calibration_values.SERVO_P1_ABS[servo] + _conversion_values[servo] * (conv - _calibration_values.SERVO_P1_DEG[servo]);
+			return (uint8_t) roundf(ret);
+			//printf("[SERVO12C] conv: %f \n", conv);
+			//printf("[SERVO12C] ret: %d \n", ret);
+
+
+		case RAD:
 
 			if (conv < SERVO_MIN_DEG[servo]) {
 				return (uint8_t) SERVO_MIN_ABS[servo];
@@ -479,27 +497,10 @@ SERVO12C::convert(float conv, uint8_t servo)
 				return (uint8_t) SERVO_MAX_ABS[servo];
 			}
 
-			ret = _calibration_values.SERVO_P1_ABS[servo] + _conversion_values[servo] * (conv - _calibration_values.SERVO_P1_DEG[servo]);
-			ret = (uint8_t) roundf(ret);
-			//printf("[SERVO12C] conv: %f \n", conv);
-			//printf("[SERVO12C] ret: %d \n", ret);
-			return ret;
-
-
-		case RAD:
-
-			if (conv < SERVO_MIN_RAD[servo]) {
-				return (uint8_t) SERVO_MIN_ABS[servo];
-			}
-			else if (conv > SERVO_MAX_RAD[servo]) {
-				return (uint8_t) SERVO_MAX_ABS[servo];
-			}
-
 			ret = _calibration_values.SERVO_P1_ABS[servo] + _conversion_values[servo] * (conv - _calibration_values.SERVO_P1_RAD[servo]);
-			ret = (uint8_t) roundf(ret);
+			return (uint8_t) roundf(ret);
 			//printf("[SERVO12C] conv: %f \n", conv);
 			//printf("[SERVO12C] ret: %d \n", ret);
-			return ret;
 
 			/* other input types are not supported */
 		default:
@@ -508,6 +509,43 @@ SERVO12C::convert(float conv, uint8_t servo)
 
 		}
 
+}
+
+void SERVO12C::calculate_speed(float speed, uint8_t servo)
+{
+	if(speed != _current_speed[servo]) {
+		int speed10, speedi;
+		uint8_t i;
+
+		_current_speed[servo] = speed;
+
+		//log("speed (before conversion) : %f", (double) speed);
+		// Convert from DEG or RAD to ABS:
+		speed = speed*_conversion_values[servo];
+
+		// speed is per second. Want it per 50 ms.
+		speedi = (int)roundf(speed / 20.0f);
+
+		//log("speed (after conversion) : %d", speedi);
+
+		// Maximum speed is 6 ABS per 0.01 seconds:
+		if(speedi > 30) {
+			speedi = 30;
+		}
+
+		speed10 = speedi / 5;
+
+		for (i = 0; i < 5; i++) {
+			_speed[servo][i] = speed10;
+		}
+
+		for (i = 0; speedi >= speed10*5 + (i+1); i++) {
+			_speed[servo][i]++;
+		}
+
+		// Reset the counter
+		_speed_count[servo] = 0;
+	}
 }
 
 int SERVO12C::parameters_init(struct servo_param_handles& h)
@@ -597,6 +635,7 @@ SERVO12C::task_cycle()
 		if (_timestamp == 0) {
 			hrt_store_absolute_time(&_timestamp);
 		}
+		_timestamp += 10000;
 
 		/* sleep waiting for data, but no more than a second */
 		int ret = ::poll(&fds[0], 1, 0);
@@ -621,33 +660,39 @@ SERVO12C::task_cycle()
 			 */
 			for (i = 0; i < SERVOS_ATTACHED; i++) {
 				_target[i] = _controls.set_value[i] ? convert(_controls.values[i], i) : _current_values[i];
-				// speed is in _input_type / s want _input_type / 0.01 s
-				_speed[i] = convert(_controls.speed[i] / 100.0f, i);
+
+				calculate_speed(_controls.speed[i], i);
 			}
 
-			// log("target: %d, speed: %d \n", _target[0], _speed[0]);
+//			for (i = 0; i < 5; i++) {
+//				log("speed %d: %d \n", i, _speed[0][i]);
+//			}
+//
+//			log("target: %d \n", _target[0]);
 
 		}
 
 		for (i = 0; i < SERVOS_ATTACHED; i++) {
 			diff = (int)_target[i] - (int)_current_values[i];
-			if (abs(diff) < _speed[i]) {
+			if ((abs(diff) < _speed[i][_speed_count[i]]) || (diff == 0) ) {
 				_val[i] = _target[i];
 			} else {
-				_val[i] = (diff > 0) ? _current_values[i] + _speed[i] : _current_values[i] - _speed[i];
+				_val[i] = (diff > 0) ? _current_values[i] + _speed[i][_speed_count[i]] : _current_values[i] - _speed[i][_speed_count[i]];
+				//log("val %d: %d",i,_val[i]);
 			}
+			_speed_count[i] = (_speed_count[i] == 4) ? 0 : _speed_count[i] + 1;
 		}
 		set_servo_values();
 
-		if(hrt_elapsed_time(&_timestamp) > 10000) {
-			//log("%llu", hrt_elapsed_time(&_timestamp));
+		if(hrt_absolute_time() > _timestamp) {
+			log("%llu", hrt_elapsed_time(&_timestamp));
+			hrt_store_absolute_time(&_timestamp);
 		}
 
-		while(hrt_elapsed_time(&_timestamp) < 10000) {
+		while(_timestamp > hrt_absolute_time()) { //hrt_elapsed_time(&_timestamp) < 10000) {
+			//log("Timestamp is larger: %llu", _timestamp - hrt_absolute_time());
 			usleep(1000);
 		}
-
-		_timestamp += 10000;
 
 	}
 

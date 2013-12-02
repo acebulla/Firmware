@@ -255,23 +255,30 @@ SERVO12C_TEST::servo12c_test_thread_main() {
 				servcon.set_value[j] = 1;
 				j++;
 			}
-			_new_val = false;
 		}
 	}
 	else
 	{
-		for (i = 0; i < SERVOS_ATTACHED; i++)
+		j = 0;
+		for (i = 0; i < 2*SERVOS_ATTACHED; i+=2)
 		{
-			servcon.values[i] = (_left) ? 220.0f : 5.0f;
+			servcon.values[j] = (_left) ? 220.0f : 5.0f;
+			servcon.speed[j] = (_left) ? 600.0f : 100.0f;
+			servcon.set_value[j] = 1;
+			j++;
 		}
 		_left = !_left;
+		_new_val = true;
 	}
 
-	orb_publish(ORB_ID(servo12c_control), topic_handle, &servcon);
+	if (_new_val) {
+		orb_publish(ORB_ID(servo12c_control), topic_handle, &servcon);
+		_new_val = false;
+	}
 
 	if (thread_should_run) {
 		/* start calling the thread at the specified rate */
-		hrt_call_after(&_call, 50000, (hrt_callout)&SERVO12C_TEST::_test_trampoline, this);
+		hrt_call_after(&_call, 500000, (hrt_callout)&SERVO12C_TEST::_test_trampoline, this);
 	}
 
 	return 0;

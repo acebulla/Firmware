@@ -78,12 +78,14 @@ __BEGIN_DECLS
  */
 typedef float	servo_position_f;
 
-/** Measured characteristics of the individual servo */
-const servo_position_f SERVO_MAX_ABS[SERVOS_ATTACHED] = {255, 255};
+/** Measured characteristics of the individual servo
+ * Pan = Servo 0; Tilt = Servo 1
+ */
+const servo_position_f SERVO_MAX_ABS[SERVOS_ATTACHED] = {225, 220};
 const servo_position_f SERVO_MAX_DEG[SERVOS_ATTACHED] = {180, 173};
 const servo_position_f SERVO_MAX_RAD[SERVOS_ATTACHED] = {PI, PI};
 
-const servo_position_f SERVO_MIN_ABS[SERVOS_ATTACHED] = {0, 0};
+const servo_position_f SERVO_MIN_ABS[SERVOS_ATTACHED] = {30, 80};
 const servo_position_f SERVO_MIN_DEG[SERVOS_ATTACHED] = {0, 0};
 const servo_position_f SERVO_MIN_RAD[SERVOS_ATTACHED] = {0, 0};
 
