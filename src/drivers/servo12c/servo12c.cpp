@@ -328,6 +328,9 @@ SERVO12C::ioctl(struct file *filp, int cmd, unsigned long arg)
 					/* switching to absolute input values */
 				case SERVO_INPUT_ABS:
 					_input_type = ABS;
+					for (i = 0; i < SERVOS_ATTACHED; i++) {
+						_conversion_values[i] = 1.0f;
+					}
 					return OK;
 
 					/* switching to degree input values */
