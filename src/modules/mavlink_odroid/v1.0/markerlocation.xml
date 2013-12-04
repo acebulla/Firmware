@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<mavlink>
+        <include>common.xml</include>
+	<version>3</version>
+	<enums>
+	</enums>
+	<messages>
+		<message id="211" name="MARKER_LOCATION">
+                       <description>The location of the marker.</description>
+                       <field type="uint8_t" name="marker_id">The id of the marker.</field>
+                       <field type="float[3]" name="pos_xyz">The xyz vector to the midpoint of the marker.</field>
+                       <field type="float" name="pan">The pan angle.</field>
+                       <field type="float" name="tilt">The tilt angle.</field>
+		</message>
+		<message id="212" name="MARKER_LOCATION_FULL">
+                       <description>The location of the marker + rotation matrix.</description>
+                       <field type="uint8_t" name="marker_id">The id of the marker.</field>
+                       <field type="float[9]" name="roation_mat">The rotationo matrix.</field>
+                       <field type="float[3]" name="pos_xyz">The xyz vector to the midpoint of the marker.</field>
+                       <field type="float" name="pan">The pan angle.</field>
+                       <field type="float" name="tilt">The tilt angle.</field>
+		</message>
+	</messages>
+</mavlink>

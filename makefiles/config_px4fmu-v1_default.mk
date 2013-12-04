@@ -67,8 +67,10 @@ MODULES		+= systemcmds/nshterm
 MODULES		+= modules/commander
 MODULES		+= modules/navigator
 MODULES		+= modules/mavlink
-MODULES		+= modules/mavlink_onboard
+# MODULES		+= modules/mavlink_onboard
 MODULES		+= modules/gpio_led
+
+MODULES		+= modules/mavlink_odroid
 
 #
 # Estimation modules (EKF / other filters)

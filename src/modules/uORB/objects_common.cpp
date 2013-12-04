@@ -197,3 +197,6 @@ ORB_DEFINE(esc_status, struct esc_status_s);
 /* new topics */
 #include <drivers/drv_servo12c.h>
 ORB_DEFINE(servo12c_control, struct servo_control_values);
+
+#include "topics/marker_location.h"
+ORB_DEFINE(marker_location, struct marker_location_s);

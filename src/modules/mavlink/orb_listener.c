@@ -713,9 +713,9 @@ l_nav_cap(const struct listener *l)
 void
 l_range_finder(const struct listener *l)
 {
-	uint8_t i;
+//	uint8_t i;
 	struct range_finder_multsens_report range_finder;
-	uint16_t distance[6];
+//	uint16_t distance[6];
 
 	orb_copy(ORB_ID(multsens_range_finder), mavlink_subs.range_finder, &range_finder);
 /*

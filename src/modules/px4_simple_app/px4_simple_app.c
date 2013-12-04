@@ -47,6 +47,7 @@
 #include <uORB/uORB.h>
 #include <drivers/drv_range_finder_multsens.h>
 #include <drivers/drv_servo12c.h>
+#include <uORB/topics/marker_location.h>
 
  
 __EXPORT int px4_simple_app_main(int argc, char *argv[]);
@@ -54,8 +55,8 @@ __EXPORT int px4_simple_app_main(int argc, char *argv[]);
 int px4_simple_app_main(int argc, char *argv[])
 {
 	/* subscribe to sensor_combined topic */
-	int sensor_sub_fd = orb_subscribe(ORB_ID(multsens_range_finder));
-	orb_set_interval(sensor_sub_fd, 541);
+	int sensor_sub_fd = orb_subscribe(ORB_ID(marker_location));
+	orb_set_interval(sensor_sub_fd, 20);
 
 	/* one could wait for multiple topics with this technique, just using one here */
 	struct pollfd fds[] = {
@@ -70,7 +71,7 @@ int px4_simple_app_main(int argc, char *argv[])
 	int i = 0;
 
 	/* obtained data for the first file descriptor */
-	struct range_finder_multsens_report raw;
+	struct marker_location_s raw;
 
 	while (true) {
 		/* wait for sensor update of 1 file descriptor for 1000 ms (1 second) */
@@ -94,18 +95,13 @@ int px4_simple_app_main(int argc, char *argv[])
 			if (fds[0].revents & POLLIN) {
 				uint8_t j;
 				/* copy sensors raw data into local buffer */
-				orb_copy(ORB_ID(multsens_range_finder), sensor_sub_fd, &raw);
-				printf("[px4_simple_app] Range finder: Start: %d End: %d Timestamp: %llu \n",
-					raw.sensor_start,
-					raw.sensor_end,
+				orb_copy(ORB_ID(marker_location), sensor_sub_fd, &raw);
+				printf("[px4_simple_app] Marker %d: x: %.2f y: %.2f z: %.2f Timestamp: %llu \n",
+					raw.marker_id,
+					raw.pos_xyz[0],
+					raw.pos_xyz[1],
+					raw.pos_xyz[2],
 					raw.timestamp);
-				for(j = raw.sensor_start; j <= raw.sensor_end; j++) {
-					printf("\t Sensor %u: Valid: %u Distance:%8.4f m \n",
-							j,
-							raw.valid[j],
-							raw.distance[j]);
-
-				}
 			}
 			/* there could be more file descriptors here, in the form like:
 			 * if (fds[1..n].revents & POLLIN) {}
