@@ -214,8 +214,8 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 
 
 
-	speed_pid_init(&pan_vel_pid, params.pan_KP, params.pan_KI, params.pan_KD, -2.0f, 2.0f, SPEED_PID_MODE_DERIVATIV_CALC, 0.02f);
-	speed_pid_init(&tilt_vel_pid, params.tilt_KP, params.tilt_KI, params.tilt_KD, -2.0f, 2.0f, SPEED_PID_MODE_DERIVATIV_CALC, 0.02f);
+	speed_pid_init(&pan_vel_pid, params.pan_KP, params.pan_KI, params.pan_KD, -0.03f, 0.03f, SPEED_PID_MODE_DERIVATIV_CALC, 0.02f);
+	speed_pid_init(&tilt_vel_pid, params.tilt_KP, params.tilt_KI, params.tilt_KD, -0.03f, 0.03f, SPEED_PID_MODE_DERIVATIV_CALC, 0.02f);
 
 
 	while (!thread_should_exit) {
@@ -231,8 +231,8 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 			parameters_update(&params_h, &params);
 
 
-			speed_pid_set_parameters(&pan_vel_pid,  params.pan_KP, params.pan_KI, params.pan_KD, -2.0f, 2.0f);
-			speed_pid_set_parameters(&tilt_vel_pid,  params.tilt_KP, params.tilt_KI, params.tilt_KD, -2.0f, 2.0f);
+			speed_pid_set_parameters(&pan_vel_pid,  params.pan_KP, params.pan_KI, params.pan_KD, -0.03f, 0.03f);
+			speed_pid_set_parameters(&tilt_vel_pid,  params.tilt_KP, params.tilt_KI, params.tilt_KD, -0.03f, 0.03f);
 		}
 
 		bool new_marker_loc;
@@ -256,7 +256,7 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 
 			/* calculate speed */
 			pan_s = speed_pid_calculate(&pan_vel_pid, 0.0, marker_loc.pan, dt);
-			tilt_s = speed_pid_calculate(&tilt_vel_pid, 0.0, marker_loc.tilt, dt);
+			tilt_s = speed_pid_calculate(&tilt_vel_pid, 0.0f, marker_loc.tilt, dt);
 
 			if (pan_s < 0) {
 				servo_control.set_value[0] = 1;

@@ -49,14 +49,16 @@
 #include <drivers/drv_servo12c.h>
 #include <uORB/topics/marker_location.h>
 
+
+
  
 __EXPORT int px4_simple_app_main(int argc, char *argv[]);
  
 int px4_simple_app_main(int argc, char *argv[])
 {
 	/* subscribe to sensor_combined topic */
-	int sensor_sub_fd = orb_subscribe(ORB_ID(marker_location));
-	orb_set_interval(sensor_sub_fd, 20);
+	int sensor_sub_fd = orb_subscribe(ORB_ID(servo12c_control));
+	orb_set_interval(sensor_sub_fd, 35);
 
 	/* one could wait for multiple topics with this technique, just using one here */
 	struct pollfd fds[] = {
@@ -71,7 +73,7 @@ int px4_simple_app_main(int argc, char *argv[])
 	int i = 0;
 
 	/* obtained data for the first file descriptor */
-	struct marker_location_s raw;
+	struct servo_control_values raw;
 
 	while (true) {
 		/* wait for sensor update of 1 file descriptor for 1000 ms (1 second) */
@@ -95,13 +97,14 @@ int px4_simple_app_main(int argc, char *argv[])
 			if (fds[0].revents & POLLIN) {
 				uint8_t j;
 				/* copy sensors raw data into local buffer */
-				orb_copy(ORB_ID(marker_location), sensor_sub_fd, &raw);
-				printf("[px4_simple_app] Marker %d: x: %.2f y: %.2f z: %.2f Timestamp: %llu \n",
-					raw.marker_id,
-					raw.pos_xyz[0],
-					raw.pos_xyz[1],
-					raw.pos_xyz[2],
-					raw.timestamp);
+				orb_copy(ORB_ID(servo12c_control), sensor_sub_fd, &raw);
+				printf("[px4_simple_app] Pan %d: %.2f %.2f Tilt %d: %.2f %.2f \n",
+					raw.set_value[0],
+					raw.speed[0],
+					raw.values[0],
+					raw.set_value[1],
+					raw.speed[1],
+					raw.values[1]);
 			}
 			/* there could be more file descriptors here, in the form like:
 			 * if (fds[1..n].revents & POLLIN) {}

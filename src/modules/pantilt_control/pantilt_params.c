@@ -41,10 +41,10 @@
 #include "pantilt_params.h"
 
 /* controller parameters */
-PARAM_DEFINE_FLOAT(PT_pan_KP, 10.0f);
+PARAM_DEFINE_FLOAT(PT_pan_KP, 1000.0f);
 PARAM_DEFINE_FLOAT(PT_pan_KI, 0.0f);
 PARAM_DEFINE_FLOAT(PT_pan_KD, 0.0f);
-PARAM_DEFINE_FLOAT(PT_tilt_KP, 10.0f);
+PARAM_DEFINE_FLOAT(PT_tilt_KP, 1000.0f);
 PARAM_DEFINE_FLOAT(PT_tilt_KI, 0.0f);
 PARAM_DEFINE_FLOAT(PT_tilt_KD, 0.0f);
 
