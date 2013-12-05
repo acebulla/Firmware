@@ -91,6 +91,8 @@ MODULES		+= modules/multirotor_pos_control
 MODULES		+= examples/flow_position_control
 MODULES		+= examples/flow_speed_control
 
+MODULES         += modules/pantilt_control
+
 #
 # Logging
 #

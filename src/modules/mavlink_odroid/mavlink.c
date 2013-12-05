@@ -481,9 +481,9 @@ int mavlink_thread_main(int argc, char *argv[])
 static void
 usage()
 {
-	fprintf(stderr, "usage: mavlink_onboard start [-d <devicename>] [-b <baud rate>]\n"
-			"       mavlink_onboard stop\n"
-			"       mavlink_onboard status\n");
+	fprintf(stderr, "usage: mavlink_odroid start [-d <devicename>] [-b <baud rate>]\n"
+			"       mavlink_odroid stop\n"
+			"       mavlink_odroid status\n");
 	exit(1);
 }
 
@@ -502,7 +502,7 @@ int mavlink_odroid_main(int argc, char *argv[])
 			errx(0, "already running");
 
 		thread_should_exit = false;
-		mavlink_task = task_spawn_cmd("mavlink_onboard",
+		mavlink_task = task_spawn_cmd("mavlink_odroid",
 					  SCHED_DEFAULT,
 					  SCHED_PRIORITY_DEFAULT,
 					  2048,
