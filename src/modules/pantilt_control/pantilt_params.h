@@ -41,21 +41,35 @@
 #include <systemlib/param/param.h>
 
 struct pantilt_params {
-	float pan_KP;
-	float pan_KI;
-	float pan_KD;
-	float tilt_KP;
-	float tilt_KI;
-	float tilt_KD;
+	float pan_pos_KP;
+	float pan_pos_KI;
+	float pan_pos_KD;
+	float tilt_pos_KP;
+	float tilt_pos_KI;
+	float tilt_pos_KD;
+
+	float pan_vel_KP;
+	float pan_vel_KI;
+	float pan_vel_KD;
+	float tilt_vel_KP;
+	float tilt_vel_KI;
+	float tilt_vel_KD;
 };
 
 struct pantilt_param_handles {
-	param_t pan_KP;
-	param_t pan_KI;
-	param_t pan_KD;
-	param_t tilt_KP;
-	param_t tilt_KI;
-	param_t tilt_KD;
+	param_t pan_pos_KP;
+	param_t pan_pos_KI;
+	param_t pan_pos_KD;
+	param_t tilt_pos_KP;
+	param_t tilt_pos_KI;
+	param_t tilt_pos_KD;
+
+	param_t pan_vel_KP;
+	param_t pan_vel_KI;
+	param_t pan_vel_KD;
+	param_t tilt_vel_KP;
+	param_t tilt_vel_KI;
+	param_t tilt_vel_KD;
 };
 
 /**

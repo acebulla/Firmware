@@ -41,34 +41,55 @@
 #include "pantilt_params.h"
 
 /* controller parameters */
-PARAM_DEFINE_FLOAT(PT_pan_KP, 1000.0f);
-PARAM_DEFINE_FLOAT(PT_pan_KI, 0.0f);
-PARAM_DEFINE_FLOAT(PT_pan_KD, 0.0f);
-PARAM_DEFINE_FLOAT(PT_tilt_KP, 1000.0f);
-PARAM_DEFINE_FLOAT(PT_tilt_KI, 0.0f);
-PARAM_DEFINE_FLOAT(PT_tilt_KD, 0.0f);
+PARAM_DEFINE_FLOAT(PT_p_pos_KP, 300.0f);
+PARAM_DEFINE_FLOAT(PT_p_pos_KI, 0.0f);
+PARAM_DEFINE_FLOAT(PT_p_pos_KD, 0.0f);
+PARAM_DEFINE_FLOAT(PT_t_pos_KP, 300.0f);
+PARAM_DEFINE_FLOAT(PT_t_pos_KI, 0.0f);
+PARAM_DEFINE_FLOAT(PT_t_pos_KD, 0.0f);
+
+PARAM_DEFINE_FLOAT(PT_p_vel_KP, 3.5f);
+PARAM_DEFINE_FLOAT(PT_p_vel_KI, 0.0f);
+PARAM_DEFINE_FLOAT(PT_p_vel_KD, 0.0f);
+PARAM_DEFINE_FLOAT(PT_t_vel_KP, 3.5f);
+PARAM_DEFINE_FLOAT(PT_t_vel_KI, 0.0f);
+PARAM_DEFINE_FLOAT(PT_t_vel_KD, 0.0f);
 
 
 int parameters_init(struct pantilt_param_handles *h)
 {
-	h->pan_KP = param_find("PT_pan_KP");
-	h->pan_KI = param_find("PT_pan_KI");
-	h->pan_KD 	=	param_find("PT_pan_KD");
-	h->tilt_KP = param_find("PT_tilt_KP");
-	h->tilt_KI = param_find("PT_tilt_KI");
-	h->tilt_KD 	=	param_find("PT_tilt_KD");
+	h->pan_pos_KP = param_find("PT_p_pos_KP");
+	h->pan_pos_KI = param_find("PT_p_pos_KI");
+	h->pan_pos_KD 	=	param_find("PT_p_pos_KD");
+	h->tilt_pos_KP = param_find("PT_t_pos_KP");
+	h->tilt_pos_KI = param_find("PT_t_pos_KI");
+	h->tilt_pos_KD 	=	param_find("PT_t_pos_KD");
+
+	h->pan_vel_KP = param_find("PT_p_vel_KP");
+	h->pan_vel_KI = param_find("PT_p_vel_KI");
+	h->pan_vel_KD 	=	param_find("PT_p_vel_KD");
+	h->tilt_vel_KP = param_find("PT_t_vel_KP");
+	h->tilt_vel_KI = param_find("PT_t_vel_KI");
+	h->tilt_vel_KD 	=	param_find("PT_t_vel_KD");
 
 	return OK;
 }
 
 int parameters_update(const struct pantilt_param_handles *h, struct pantilt_params *p)
 {
-	param_get(h->pan_KP, &(p->pan_KP));
-	param_get(h->pan_KI, &(p->pan_KI));
-	param_get(h->pan_KD, &(p->pan_KD));
-	param_get(h->tilt_KP, &(p->tilt_KP));
-	param_get(h->tilt_KI, &(p->tilt_KI));
-	param_get(h->tilt_KD, &(p->tilt_KD));
+	param_get(h->pan_pos_KP, &(p->pan_pos_KP));
+	param_get(h->pan_pos_KI, &(p->pan_pos_KI));
+	param_get(h->pan_pos_KD, &(p->pan_pos_KD));
+	param_get(h->tilt_pos_KP, &(p->tilt_pos_KP));
+	param_get(h->tilt_pos_KI, &(p->tilt_pos_KI));
+	param_get(h->tilt_pos_KD, &(p->tilt_pos_KD));
+
+	param_get(h->pan_vel_KP, &(p->pan_vel_KP));
+	param_get(h->pan_vel_KI, &(p->pan_vel_KI));
+	param_get(h->pan_vel_KD, &(p->pan_vel_KD));
+	param_get(h->tilt_vel_KP, &(p->tilt_vel_KP));
+	param_get(h->tilt_vel_KI, &(p->tilt_vel_KI));
+	param_get(h->tilt_vel_KD, &(p->tilt_vel_KD));
 
 	return OK;
 }

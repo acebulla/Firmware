@@ -39,4 +39,5 @@ MODULE_COMMAND	= pantilt_control
 
 SRCS		= pantilt_control.c \
 		  pantilt_params.c \
-		  pos_pid.c
+		  pos_pid.c \
+		  speed_pid.c
