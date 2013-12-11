@@ -70,6 +70,7 @@ static bool thread_running = false;		/**< Deamon status flag */
 static int deamon_task;				/**< Handle of deamon task / thread */
 
 static float start_pos = 1.5708f;
+static float error_band = 0.0523f; /** 3° */
 
 __EXPORT int pantilt_control_main(int argc, char *argv[]);
 
@@ -228,8 +229,8 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 
 
 
-	pos_pid_init(&pan_pos_pid, params.pan_KP, params.pan_KI, params.pan_KD, -0.03f, 0.03f, POS_PID_MODE_DERIVATIV_CALC, 0.02f);
-	pos_pid_init(&tilt_pos_pid, params.tilt_KP, params.tilt_KI, params.tilt_KD, -0.03f, 0.03f, POS_PID_MODE_DERIVATIV_CALC, 0.02f);
+	pos_pid_init(&pan_pos_pid, params.pan_KP, params.pan_KI, params.pan_KD, -error_band, error_band, POS_PID_MODE_DERIVATIV_CALC, 0.02f);
+	pos_pid_init(&tilt_pos_pid, params.tilt_KP, params.tilt_KI, params.tilt_KD, -error_band, error_band, POS_PID_MODE_DERIVATIV_CALC, 0.02f);
 
 	servo_position_f pan_pos = start_pos;
 	servo_position_f tilt_pos = start_pos;
@@ -248,8 +249,8 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 			parameters_update(&params_h, &params);
 
 
-			pos_pid_set_parameters(&pan_pos_pid,  params.pan_KP, params.pan_KI, params.pan_KD, -0.03f, 0.03f);
-			pos_pid_set_parameters(&tilt_pos_pid,  params.tilt_KP, params.tilt_KI, params.tilt_KD, -0.03f, 0.03f);
+			pos_pid_set_parameters(&pan_pos_pid,  params.pan_KP, params.pan_KI, params.pan_KD, -error_band, error_band);
+			pos_pid_set_parameters(&tilt_pos_pid,  params.tilt_KP, params.tilt_KI, params.tilt_KD, -error_band, error_band);
 		}
 
 		bool pos_updated;
@@ -326,7 +327,8 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 
 
 		/* run at approximately 30 Hz */
-		usleep(34000);
+		// usleep(34000);
+		usleep(40000);
 	}
 
 	warnx("stopped");

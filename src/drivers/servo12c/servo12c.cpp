@@ -729,28 +729,44 @@ SERVO12C::task_cycle()
 			/* For every servo, if the value must be adjusted then convert it and store it in the msg array,
 			 * otherwise use the old value.
 			 */
+//			log("set value: %d, value: %.3f, convert(value): %d, current value: %d",
+//						_controls.set_value[0],
+//						_controls.values[0],
+//						convert(_controls.values[0], 0),
+//						_current_values[0]);
+
 			for (i = 0; i < SERVOS_ATTACHED; i++) {
+
 				_target[i] = _controls.set_value[i] ? convert(_controls.values[i], i) : _current_values[i];
 
 				calculate_speed(_controls.speed[i], i);
 			}
+//			log("target: %d \n", _target[0]);
 
 //			for (i = 0; i < 5; i++) {
-//				log("speed %d: %d \n", i, _speed[0][i]);
+//				log("speed %d: %d \n", i, _speed[1][i]);
 //			}
-//
-//			log("target: %d \n", _target[0]);
+
+
 
 		}
 
+		uint8_t val_changed;
+		val_changed = 2;
+
 		for (i = 0; i < SERVOS_ATTACHED; i++) {
 			diff = (int)_target[i] - (int)_current_values[i];
-			if ((abs(diff) < _speed[i][_speed_count[i]]) || (diff == 0) ) {
+			if (diff == 0) {
+				val_changed--;
+			}
+
+			if ((abs(diff) < _speed[i][_speed_count[i]])) {
 				_val[i] = _target[i];
 			} else {
 				_val[i] = (diff > 0) ? _current_values[i] + _speed[i][_speed_count[i]] : _current_values[i] - _speed[i][_speed_count[i]];
-				//log("current_values %d: %d",i,_current_values[i]);
-				//log("val %d: %d",i,_val[i]);
+//				log("diff: %d", diff);
+//				log("current_values %d: %d",i,_current_values[i]);
+//				log("val %d: %d",i,_val[i]);
 			}
 			_speed_count[i] = (_speed_count[i] == 4) ? 0 : _speed_count[i] + 1;
 		}
@@ -760,7 +776,7 @@ SERVO12C::task_cycle()
 //		}
 
 		// To avoid jittering servos
-		if (diff != 0) {
+		if (val_changed != 0) {
 			set_servo_values();
 		}
 
