@@ -58,6 +58,7 @@ int px4_simple_app_main(int argc, char *argv[])
 {
 	/* subscribe to sensor_combined topic */
 	int sensor_sub_fd = orb_subscribe(ORB_ID(servo12c_control));
+//	int sensor_sub_fd = orb_subscribe(ORB_ID(servo12c_position));
 	orb_set_interval(sensor_sub_fd, 35);
 
 	/* one could wait for multiple topics with this technique, just using one here */
@@ -74,6 +75,7 @@ int px4_simple_app_main(int argc, char *argv[])
 
 	/* obtained data for the first file descriptor */
 	struct servo_control_values raw;
+//	struct servo_pos_values raw;
 
 	while (true) {
 		/* wait for sensor update of 1 file descriptor for 1000 ms (1 second) */
@@ -98,6 +100,9 @@ int px4_simple_app_main(int argc, char *argv[])
 				uint8_t j;
 				/* copy sensors raw data into local buffer */
 				orb_copy(ORB_ID(servo12c_control), sensor_sub_fd, &raw);
+//				printf("[px4_simple_app] Pan: %.4f Tilt: %.4f \n",
+//								raw.values[0],
+//								raw.values[1]);
 				printf("[px4_simple_app] Pan %d: %.2f %.2f Tilt %d: %.2f %.2f \n",
 					raw.set_value[0],
 					raw.speed[0],

@@ -119,7 +119,7 @@ SERVO12C_TEST::start(char manual)
 	/* generate the initial data for first publication */
 	for (i = 0; i < SERVOS_ATTACHED; i++)
 	{
-		servcon.values[i] = 10.0f; servcon.set_value[i] = 1;
+		servcon.values[i] = 100.0f; servcon.set_value[i] = 1;
 	}
 	_left = false;
 
@@ -142,6 +142,8 @@ SERVO12C_TEST::start(char manual)
 
 	/* advertise the topic and make the initial publication */
 	topic_handle = orb_advertise(ORB_ID(servo12c_control), &servcon);
+
+	orb_publish(ORB_ID(servo12c_control), topic_handle, &servcon);
 
 	/* start calling the thread at the specified rate */
 	hrt_call_after(&_call, 1000, (hrt_callout)&SERVO12C_TEST::_test_trampoline, this);
@@ -272,7 +274,7 @@ SERVO12C_TEST::servo12c_test_thread_main() {
 	}
 
 	if (_new_val) {
-		orb_publish(ORB_ID(servo12c_control), topic_handle, &servcon);
+//		orb_publish(ORB_ID(servo12c_control), topic_handle, &servcon);
 		_new_val = false;
 	}
 

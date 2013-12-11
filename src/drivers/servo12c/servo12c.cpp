@@ -140,7 +140,9 @@ private:
 	struct servo_calibration_values _calibration_values;
 
 	int					_servo_control_topic;
+
 	struct servo_control_values	_controls;
+	struct servo_pos_values _positions;
 
 	uint8_t _msg[SERVOS_ATTACHED+1];
 	uint8_t * _val;
@@ -183,6 +185,8 @@ private:
 	 */
 
 	uint8_t				convert(float conv, uint8_t servo);
+
+	float				convert_back(uint8_t conv, uint8_t servo);
 
 	void				calculate_speed(float speed, uint8_t servo);
 
@@ -339,6 +343,7 @@ SERVO12C::ioctl(struct file *filp, int cmd, unsigned long arg)
 					for (i = 0; i < SERVOS_ATTACHED; i++) {
 						_conversion_values[i] = (_calibration_values.SERVO_P2_ABS[i] - _calibration_values.SERVO_P1_ABS[i])
 								/ (_calibration_values.SERVO_P2_DEG[i] - _calibration_values.SERVO_P1_DEG[i]);
+						//printf("[SERVO12C] DEG conversion value %d: %.4f \n", i, _conversion_values[i]);
 					}
 					return OK;
 
@@ -348,6 +353,11 @@ SERVO12C::ioctl(struct file *filp, int cmd, unsigned long arg)
 					for (i = 0; i < SERVOS_ATTACHED; i++) {
 						_conversion_values[i] = (_calibration_values.SERVO_P2_ABS[i] - _calibration_values.SERVO_P1_ABS[i])
 										/ (_calibration_values.SERVO_P2_RAD[i] - _calibration_values.SERVO_P1_RAD[i]);
+						//printf("[SERVO12C] RAD SERVO_P1_ABS %d: %.4f \n", i, _calibration_values.SERVO_P1_ABS[i]);
+						//printf("[SERVO12C] RAD SERVO_P2_ABS %d: %.4f \n", i, _calibration_values.SERVO_P2_ABS[i]);
+						//printf("[SERVO12C] RAD SERVO_P1_RAD %d: %.4f \n", i, _calibration_values.SERVO_P1_RAD[i]);
+						//printf("[SERVO12C] RAD SERVO_P2_RAD %d: %.4f \n", i, _calibration_values.SERVO_P2_RAD[i]);
+						//printf("[SERVO12C] RAD conversion value %d: %.4f \n", i, _conversion_values[i]);
 					}
 					return OK;
 
@@ -472,9 +482,11 @@ SERVO12C::convert(float conv, uint8_t servo)
 					return (uint8_t) SERVO_MAX_ABS[servo];
 			}
 
-			return (uint8_t) conv;
-			//printf("[SERVO12C] conv: %f \n", conv);
+
+			//printf("[SERVO12C] ABS conv: %.4f \n", conv);
 			//printf("[SERVO12C] ret: %d \n", ret);
+
+			return (uint8_t) conv;
 
 		case DEG:
 
@@ -486,28 +498,70 @@ SERVO12C::convert(float conv, uint8_t servo)
 			}
 
 			ret = _calibration_values.SERVO_P1_ABS[servo] + _conversion_values[servo] * (conv - _calibration_values.SERVO_P1_DEG[servo]);
-			return (uint8_t) roundf(ret);
-			//printf("[SERVO12C] conv: %f \n", conv);
+
+			//printf("DEG [SERVO12C] conv: %.4f \n", conv);
 			//printf("[SERVO12C] ret: %d \n", ret);
 
-
+			return (uint8_t) roundf(ret);
 		case RAD:
 
-			if (conv < SERVO_MIN_DEG[servo]) {
+			if (conv < SERVO_MIN_RAD[servo]) {
 				return (uint8_t) SERVO_MIN_ABS[servo];
 			}
-			else if (conv > SERVO_MAX_DEG[servo]) {
+			else if (conv > SERVO_MAX_RAD[servo]) {
 				return (uint8_t) SERVO_MAX_ABS[servo];
 			}
 
 			ret = _calibration_values.SERVO_P1_ABS[servo] + _conversion_values[servo] * (conv - _calibration_values.SERVO_P1_RAD[servo]);
-			return (uint8_t) roundf(ret);
-			//printf("[SERVO12C] conv: %f \n", conv);
-			//printf("[SERVO12C] ret: %d \n", ret);
 
+			//printf("[SERVO12C] RAD conv: %.4f \n", conv);
+			//printf("[SERVO12C] ret: %d \n", ret);
+			return (uint8_t) roundf(ret);
 			/* other input types are not supported */
 		default:
 			return 127;
+
+
+		}
+
+}
+
+float
+SERVO12C::convert_back(uint8_t conv, uint8_t servo)
+{
+	float ret;
+
+	switch (_input_type) {
+
+
+		case ABS:
+
+
+			//printf("[SERVO12C] Convert back ABS:");
+			//printf("[SERVO12C] conv: %d \n", conv);
+			//printf("[SERVO12C] ret: %.4f \n", (float) conv);
+			return (float) conv;
+		case DEG:
+
+			ret = _calibration_values.SERVO_P1_DEG[servo] + ((float) conv - _calibration_values.SERVO_P1_ABS[servo]) / _conversion_values[servo];
+
+			//printf("[SERVO12C] Convert back DEG:");
+			//printf("[SERVO12C] conv: %d \n", conv);
+			//printf("[SERVO12C] ret: %.4f \n", ret);
+
+			return ret;
+		case RAD:
+
+			ret = _calibration_values.SERVO_P1_RAD[servo] + ((float) conv - _calibration_values.SERVO_P1_ABS[servo]) / _conversion_values[servo];
+
+			//printf("[SERVO12C] Convert back RAD:");
+			//printf("[SERVO12C] conv: %d \n", conv);
+			//printf("[SERVO12C] ret: %.4f \n", ret);
+
+			return ret;
+			/* other input types are not supported */
+		default:
+			return 127.0f;
 
 
 		}
@@ -522,7 +576,7 @@ void SERVO12C::calculate_speed(float speed, uint8_t servo)
 
 		_current_speed[servo] = speed;
 
-		//log("speed (before conversion) : %f", (double) speed);
+		//log("speed (before conversion) : %.4f", (double) speed);
 		// Convert from DEG or RAD to ABS:
 		speed = speed*_conversion_values[servo];
 
@@ -615,14 +669,28 @@ SERVO12C::task_cycle_trampoline(int argc, char *argv[])
 void
 SERVO12C::task_cycle()
 {
+	uint8_t i;
 	struct servo_param_handles param_handles;
 
 	/* get parameters of the servo calibration */
 	parameters_init(param_handles);
+	parameters_update(param_handles, _calibration_values);
 
+//	log("SERVO_P1_ABS: %f \n", _calibration_values.SERVO_P1_ABS[0]);
+//	log("SERVO_P1_DEG: %f \n", _calibration_values.SERVO_P1_DEG[0]);
+//	log("SERVO_P1_RAD: %f \n", _calibration_values.SERVO_P1_RAD[0]);
+//
+//	log("SERVO_P2_ABS: %f \n", _calibration_values.SERVO_P2_ABS[0]);
+//	log("SERVO_P2_DEG: %f \n", _calibration_values.SERVO_P2_DEG[0]);
+//	log("SERVO_P2_RAD: %f \n", _calibration_values.SERVO_P2_RAD[0]);
 
 	/* Subscribe to the servo12c_control topic */
 	_servo_control_topic = orb_subscribe(ORB_ID(servo12c_control));
+
+	for(i = 0; i < SERVOS_ATTACHED; i++) {
+		_positions.values[i] = 1.0f;
+	}
+	orb_advert_t servo_pos_pub = orb_advertise(ORB_ID(servo12c_position), &_positions);
 
 	pollfd fds[1];
 	fds[0].fd = _servo_control_topic;
@@ -652,7 +720,7 @@ SERVO12C::task_cycle()
 		/* do we have a control update? */
 		if (fds[0].revents & POLLIN) {
 
-			parameters_update(param_handles, _calibration_values);
+
 
 
 			/* get controls - must always do this to avoid spinning */
@@ -681,16 +749,30 @@ SERVO12C::task_cycle()
 				_val[i] = _target[i];
 			} else {
 				_val[i] = (diff > 0) ? _current_values[i] + _speed[i][_speed_count[i]] : _current_values[i] - _speed[i][_speed_count[i]];
+				//log("current_values %d: %d",i,_current_values[i]);
 				//log("val %d: %d",i,_val[i]);
 			}
 			_speed_count[i] = (_speed_count[i] == 4) ? 0 : _speed_count[i] + 1;
 		}
-		set_servo_values();
+
+//		for (i = 0; i < 5; i++) {
+//			log("speed %d: %d \n", i, _speed[0][i]);
+//		}
+
+		// To avoid jittering servos
+		if (diff != 0) {
+			set_servo_values();
+		}
 
 		if(hrt_absolute_time() > _timestamp) {
-			log("%llu", hrt_elapsed_time(&_timestamp));
+//			log("%llu", hrt_elapsed_time(&_timestamp));
 			hrt_store_absolute_time(&_timestamp);
 		}
+
+		for(i = 0; i < SERVOS_ATTACHED; i++) {
+			_positions.values[i] = convert_back(_current_values[i], i);
+		}
+		orb_publish(ORB_ID(servo12c_position), servo_pos_pub, &_positions);
 
 		while(_timestamp > hrt_absolute_time()) { //hrt_elapsed_time(&_timestamp) < 10000) {
 			//log("Timestamp is larger: %llu", _timestamp - hrt_absolute_time());

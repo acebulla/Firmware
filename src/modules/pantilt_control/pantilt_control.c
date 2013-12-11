@@ -62,12 +62,14 @@
 #include <drivers/drv_servo12c.h>
 
 #include "pantilt_params.h"
-#include "speed_pid.h"
+#include "pos_pid.h"
 
 
 static bool thread_should_exit = false;		/**< Deamon exit flag */
 static bool thread_running = false;		/**< Deamon status flag */
 static int deamon_task;				/**< Handle of deamon task / thread */
+
+static float start_pos = 1.5708f;
 
 __EXPORT int pantilt_control_main(int argc, char *argv[]);
 
@@ -173,37 +175,49 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 	mavlink_fd = open(MAVLINK_LOG_DEVICE, 0);
 	mavlink_log_info(mavlink_fd, "[pantilt] started");
 
+	/* set the position input to RAD */
+	int fd = open(SERVO12C_DEVICE_PATH, O_RDONLY);
+
+	if (fd < 0) {
+		//printf("fd: %d", fd);
+		errx(1, "Could not set input type");;
+	}
+
+	if (ioctl(fd, SERVO_INPUT, SERVO_INPUT_RAD) < 0) {
+		close(fd);
+		errx(1, "Could not set input type");;
+	}
+
+	close(fd);
+
 	/* structures */
 	struct marker_location_s marker_loc;
 	memset(&marker_loc, 0, sizeof(marker_loc));
 	struct servo_control_values servo_control;
 
-	servo_control.set_value[0] = 1;
-	servo_control.speed[0] = 0.0f;
-	servo_control.values[0] = 127.0f;
-	servo_control.set_value[1] = 1;
-	servo_control.speed[1] = 0.0f;
-	servo_control.values[1] = 127.0f;
+	uint8_t i;
+
+	for (i = 0; i < SERVOS_ATTACHED; i++) {
+		servo_control.set_value[i] = 1;
+		servo_control.speed[i] = 7.8f;
+		servo_control.values[i] = start_pos;
+	}
 
 	/* subscribe to marker location and system state */
 	int param_sub = orb_subscribe(ORB_ID(parameter_update));
 	int marker_location_sub = orb_subscribe(ORB_ID(marker_location));
-	int servo_control_sub = orb_subscribe(ORB_ID(servo12c_control));
+	int pos_sub = orb_subscribe(ORB_ID(servo12c_position));
 
 	/* publish setpoint XXX */
 //	orb_advert_t local_pos_sp_pub = orb_advertise(ORB_ID(vehicle_local_position_setpoint), &local_pos_sp);
-	orb_advert_t servo_control_pub = orb_advertise(ORB_ID(servo12c_control), &servo_control_sub);
+	orb_advert_t servo_control_pub = orb_advertise(ORB_ID(servo12c_control), &servo_control);
+
+
 
 	hrt_abstime t_prev = 0;
-	const float alt_ctl_dz = 0.2f;
-	const float pos_ctl_dz = 0.05f;
 
-	float ref_alt = 0.0f;
-	hrt_abstime ref_alt_t = 0;
-	uint64_t local_ref_timestamp = 0;
-
-	speed_pid_t pan_vel_pid;
-	speed_pid_t tilt_vel_pid;
+	pos_pid_t pan_pos_pid;
+	pos_pid_t tilt_pos_pid;
 
 	thread_running = true;
 
@@ -214,8 +228,11 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 
 
 
-	speed_pid_init(&pan_vel_pid, params.pan_KP, params.pan_KI, params.pan_KD, -0.03f, 0.03f, SPEED_PID_MODE_DERIVATIV_CALC, 0.02f);
-	speed_pid_init(&tilt_vel_pid, params.tilt_KP, params.tilt_KI, params.tilt_KD, -0.03f, 0.03f, SPEED_PID_MODE_DERIVATIV_CALC, 0.02f);
+	pos_pid_init(&pan_pos_pid, params.pan_KP, params.pan_KI, params.pan_KD, -0.03f, 0.03f, POS_PID_MODE_DERIVATIV_CALC, 0.02f);
+	pos_pid_init(&tilt_pos_pid, params.tilt_KP, params.tilt_KI, params.tilt_KD, -0.03f, 0.03f, POS_PID_MODE_DERIVATIV_CALC, 0.02f);
+
+	servo_position_f pan_pos = start_pos;
+	servo_position_f tilt_pos = start_pos;
 
 
 	while (!thread_should_exit) {
@@ -231,8 +248,20 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 			parameters_update(&params_h, &params);
 
 
-			speed_pid_set_parameters(&pan_vel_pid,  params.pan_KP, params.pan_KI, params.pan_KD, -0.03f, 0.03f);
-			speed_pid_set_parameters(&tilt_vel_pid,  params.tilt_KP, params.tilt_KI, params.tilt_KD, -0.03f, 0.03f);
+			pos_pid_set_parameters(&pan_pos_pid,  params.pan_KP, params.pan_KI, params.pan_KD, -0.03f, 0.03f);
+			pos_pid_set_parameters(&tilt_pos_pid,  params.tilt_KP, params.tilt_KI, params.tilt_KD, -0.03f, 0.03f);
+		}
+
+		bool pos_updated;
+		orb_check(pos_sub, &pos_updated);
+
+		if (pos_updated) {
+			/* clear updated flag */
+			struct servo_pos_values sp;
+			orb_copy(ORB_ID(servo12c_position), pos_sub, &sp);
+
+			pan_pos = sp.values[0];
+			tilt_pos = sp.values[1];
 		}
 
 		bool new_marker_loc;
@@ -254,29 +283,37 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 			/* clear updated flag */
 			orb_copy(ORB_ID(marker_location), marker_location_sub, &marker_loc);
 
-			/* calculate speed */
-			pan_s = speed_pid_calculate(&pan_vel_pid, 0.0, marker_loc.pan, dt);
-			tilt_s = speed_pid_calculate(&tilt_vel_pid, 0.0f, marker_loc.tilt, dt);
+			/* calculate position */
+			pan_s = pan_pos + pos_pid_calculate(&pan_pos_pid, 0.0f, marker_loc.pan, dt);
+			tilt_s = tilt_pos + pos_pid_calculate(&tilt_pos_pid, 0.0f, marker_loc.tilt, dt);
 
-			if (pan_s < 0) {
-				servo_control.set_value[0] = 1;
-				servo_control.speed[0] = -pan_s;
-				servo_control.values[0] = 0.0f;
-			} else {
-				servo_control.set_value[0] = 1;
-				servo_control.speed[0] = pan_s;
-				servo_control.values[0] = 255.0f;
-			}
+//			if (pan_s < 0) {
+//				servo_control.set_value[0] = 1;
+//				servo_control.speed[0] = -pan_s;
+//				servo_control.values[0] = 0.0f;
+//			} else {
+//				servo_control.set_value[0] = 1;
+//				servo_control.speed[0] = pan_s;
+//				servo_control.values[0] = 255.0f;
+//			}
+//
+//			if (tilt_s < 0) {
+//				servo_control.set_value[1] = 1;
+//				servo_control.speed[1] = -tilt_s;
+//				servo_control.values[1] = 0.0f;
+//			} else {
+//				servo_control.set_value[1] = 1;
+//				servo_control.speed[1] = tilt_s;
+//				servo_control.values[1] = 255.0f;
+//			}
 
-			if (tilt_s < 0) {
-				servo_control.set_value[1] = 1;
-				servo_control.speed[1] = -tilt_s;
-				servo_control.values[1] = 0.0f;
-			} else {
-				servo_control.set_value[1] = 1;
-				servo_control.speed[1] = tilt_s;
-				servo_control.values[1] = 255.0f;
-			}
+			servo_control.set_value[0] = 1;
+			servo_control.speed[0] = 7.8f;
+			servo_control.values[0] = pan_s;
+
+			servo_control.set_value[1] = 1;
+			servo_control.speed[1] = 7.8f;
+			servo_control.values[1] = tilt_s;
 
 
 			orb_publish(ORB_ID(servo12c_control), servo_control_pub, &servo_control);

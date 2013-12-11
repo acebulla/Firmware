@@ -82,12 +82,12 @@ typedef float	servo_position_f;
  * Pan = Servo 0; Tilt = Servo 1
  */
 const servo_position_f SERVO_MAX_ABS[SERVOS_ATTACHED] = {225, 220};
-const servo_position_f SERVO_MAX_DEG[SERVOS_ATTACHED] = {180, 173};
-const servo_position_f SERVO_MAX_RAD[SERVOS_ATTACHED] = {PI, PI};
+const servo_position_f SERVO_MAX_DEG[SERVOS_ATTACHED] = {158, 154};
+const servo_position_f SERVO_MAX_RAD[SERVOS_ATTACHED] = {2.76f, 2.7f};
 
 const servo_position_f SERVO_MIN_ABS[SERVOS_ATTACHED] = {30, 80};
-const servo_position_f SERVO_MIN_DEG[SERVOS_ATTACHED] = {0, 0};
-const servo_position_f SERVO_MIN_RAD[SERVOS_ATTACHED] = {0, 0};
+const servo_position_f SERVO_MIN_DEG[SERVOS_ATTACHED] = {21, 56};
+const servo_position_f SERVO_MIN_RAD[SERVOS_ATTACHED] = {0.37f, 1.0f};
 
 /** Two points measured to calibrate the servos.
  *  Used to convert from DEG or RAD to ABS values.
@@ -140,6 +140,18 @@ struct servo_control_values {
  * ORB tag for servo control.
  */
 ORB_DECLARE(servo12c_control);
+
+/**
+ * Structure for current position of servos.
+ */
+struct servo_pos_values {
+	servo_position_f	values[SERVOS_ATTACHED];
+};
+
+/*
+ * ORB tag for servo position.
+ */
+ORB_DECLARE(servo12c_position);
 
 
 /*
