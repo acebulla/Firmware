@@ -119,7 +119,7 @@ SERVO12C_TEST::start(char manual)
 	/* generate the initial data for first publication */
 	for (i = 0; i < SERVOS_ATTACHED; i++)
 	{
-		servcon.values[i] = 100.0f; servcon.set_value[i] = 1;
+		servcon.values[i] = 130.0f; servcon.set_value[i] = 1;
 	}
 	_left = false;
 
@@ -261,20 +261,20 @@ SERVO12C_TEST::servo12c_test_thread_main() {
 	}
 	else
 	{
-		j = 0;
+		j = 1;
 		for (i = 0; i < 2*SERVOS_ATTACHED; i+=2)
 		{
-			servcon.values[j] = (_left) ? 220.0f : 5.0f;
-			servcon.speed[j] = (_left) ? 600.0f : 100.0f;
+			servcon.values[j] = (_left) ? 180.0f : 120.0f;
+			servcon.speed[j] = (_left) ? 600.0f : 600.0f;
 			servcon.set_value[j] = 1;
-			j++;
+			//j++;
 		}
 		_left = !_left;
 		_new_val = true;
 	}
 
 	if (_new_val) {
-//		orb_publish(ORB_ID(servo12c_control), topic_handle, &servcon);
+		orb_publish(ORB_ID(servo12c_control), topic_handle, &servcon);
 		_new_val = false;
 	}
 
