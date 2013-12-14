@@ -96,9 +96,17 @@ private:
 	float _value[2*SERVOS_ATTACHED]; bool _new_val;
 	bool _manual;
 	bool _left;
+	bool _at_target;
 	bool thread_should_run;
 	int topic_handle;
+	int val_changed;
+	float _speed;
 	struct servo_control_values servcon;
+
+	bool _target_reached[2];
+
+	servo_position_f _current_pos[2];
+	servo_position_f _target[2];
 
 };
 
@@ -113,15 +121,21 @@ SERVO12C_TEST::start(char manual)
 {
 	thread_should_run = true;
 	_manual = (bool) manual;
+	val_changed = 0;
+	_speed = 5;
+
 	int fd;
 	uint8_t i;
 
 	/* generate the initial data for first publication */
 	for (i = 0; i < SERVOS_ATTACHED; i++)
 	{
-		servcon.values[i] = 130.0f; servcon.set_value[i] = 1;
+		_target[i] = 127.0f; servcon.set_value[i] = 1;
+		_current_pos[i] = _target[i];
 	}
 	_left = false;
+
+
 
 	/* Tell driver to use absolute values */
 	fd = open(SERVO12C_DEVICE_PATH, O_RDONLY);
@@ -142,8 +156,7 @@ SERVO12C_TEST::start(char manual)
 
 	/* advertise the topic and make the initial publication */
 	topic_handle = orb_advertise(ORB_ID(servo12c_control), &servcon);
-
-	orb_publish(ORB_ID(servo12c_control), topic_handle, &servcon);
+	usleep(5000);
 
 	/* start calling the thread at the specified rate */
 	hrt_call_after(&_call, 1000, (hrt_callout)&SERVO12C_TEST::_test_trampoline, this);
@@ -245,6 +258,8 @@ fail:
 int
 SERVO12C_TEST::servo12c_test_thread_main() {
 	uint8_t i, j;
+	int diff;
+
 	if (_manual)
 	{
 		if (_new_val)
@@ -252,35 +267,60 @@ SERVO12C_TEST::servo12c_test_thread_main() {
 			j = 0;
 			for (i = 0; i < 2*SERVOS_ATTACHED; i+=2)
 			{
-				servcon.values[j] = _value[i];
-				servcon.speed[j] = _value[i+1];
+				_target[j] = _value[i];
+				_target_reached[j] = false;
+//				servcon.values[j] = _value[i];
+//				servcon.speed[j] = _value[i+1];
 				servcon.set_value[j] = 1;
 				j++;
 			}
 		}
 	}
-	else
+	else if (_target_reached[0] && _target_reached[1])
 	{
 		j = 1;
-		for (i = 0; i < 2*SERVOS_ATTACHED; i+=2)
+		_target[0] = 127.0f;
+		for (i = 0; (i < 2*SERVOS_ATTACHED); i+=2)
 		{
-			servcon.values[j] = (_left) ? 180.0f : 120.0f;
-			servcon.speed[j] = (_left) ? 600.0f : 600.0f;
-			servcon.set_value[j] = 1;
+			_target[j] = (_left) ? 180.0f : 120.0f;
+			_target_reached[j] = false;
+//			servcon.speed[j] = (_left) ? 600.0f : 600.0f;
+//			servcon.set_value[j] = 1;
 			//j++;
 		}
 		_left = !_left;
-		_new_val = true;
 	}
 
-	if (_new_val) {
+	for (i = 0; i < SERVOS_ATTACHED; i++) {
+//		diff = _target[i] - _current_pos[i];
+//
+//		if (diff == 0) {
+//			_target_reached[i] = true;
+//		}
+//
+//		if ((float) fabs(diff) < _speed) {
+//			_current_pos[i] = _target[i];
+//		} else {
+//			_current_pos[i] = (diff > 0) ? _current_pos[i] + _speed : _current_pos[i] - _speed;
+//		}
+
+//		servcon.values[i] = _current_pos[i];
+		servcon.values[i] = _target[i];
+		servcon.set_value[i] = 1;
+	}
+
+
+
+	if (!(_target_reached[0] && _target_reached[1]) ) {
 		orb_publish(ORB_ID(servo12c_control), topic_handle, &servcon);
+		_target_reached[0] = true;
+		_target_reached[1] = true;
 		_new_val = false;
 	}
 
 	if (thread_should_run) {
 		/* start calling the thread at the specified rate */
-		hrt_call_after(&_call, 500000, (hrt_callout)&SERVO12C_TEST::_test_trampoline, this);
+		hrt_call_after(&_call, 10000, (hrt_callout)&SERVO12C_TEST::_test_trampoline, this);
 	}
 
 	return 0;

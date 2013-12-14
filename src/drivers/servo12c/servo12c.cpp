@@ -142,15 +142,15 @@ private:
 	int					_servo_control_topic;
 
 	struct servo_control_values	_controls;
-	struct servo_pos_values _positions;
+//	struct servo_pos_values _positions;
 
 	uint8_t _msg[SERVOS_ATTACHED+1];
 	uint8_t * _val;
 	uint8_t _target[SERVOS_ATTACHED];
-	uint8_t _speed[SERVOS_ATTACHED][5];
-	uint8_t	_speed_count[SERVOS_ATTACHED];
+//	uint8_t _speed[SERVOS_ATTACHED][5];
+//	uint8_t	_speed_count[SERVOS_ATTACHED];
 
-	hrt_abstime _timestamp;
+//	hrt_abstime _timestamp;
 
 
 	perf_counter_t		_sample_perf;
@@ -186,9 +186,9 @@ private:
 
 	uint8_t				convert(float conv, uint8_t servo);
 
-	float				convert_back(uint8_t conv, uint8_t servo);
+//	float				convert_back(uint8_t conv, uint8_t servo);
 
-	void				calculate_speed(float speed, uint8_t servo);
+//	void				calculate_speed(float speed, uint8_t servo);
 
 	int parameters_init(struct servo_param_handles& h);
 	int parameters_update(const struct servo_param_handles& h, struct servo_calibration_values& p);
@@ -228,11 +228,11 @@ SERVO12C::SERVO12C(int bus, uint8_t address) :
 
 	_val = &_msg[1];
 
-	_timestamp = 0;
+//	_timestamp = 0;
 
 	memset(_msg, 0, sizeof(_msg));
 	memset(_target, 127, sizeof(_target));
-	memset(_speed, 5, sizeof(_speed));
+//	memset(_speed, 5, sizeof(_speed));
 	memset(_current_values, 127, sizeof(_current_values));
 }
 
@@ -353,11 +353,11 @@ SERVO12C::ioctl(struct file *filp, int cmd, unsigned long arg)
 					for (i = 0; i < SERVOS_ATTACHED; i++) {
 						_conversion_values[i] = (_calibration_values.SERVO_P2_ABS[i] - _calibration_values.SERVO_P1_ABS[i])
 										/ (_calibration_values.SERVO_P2_RAD[i] - _calibration_values.SERVO_P1_RAD[i]);
-						//printf("[SERVO12C] RAD SERVO_P1_ABS %d: %.4f \n", i, _calibration_values.SERVO_P1_ABS[i]);
-						//printf("[SERVO12C] RAD SERVO_P2_ABS %d: %.4f \n", i, _calibration_values.SERVO_P2_ABS[i]);
-						//printf("[SERVO12C] RAD SERVO_P1_RAD %d: %.4f \n", i, _calibration_values.SERVO_P1_RAD[i]);
-						//printf("[SERVO12C] RAD SERVO_P2_RAD %d: %.4f \n", i, _calibration_values.SERVO_P2_RAD[i]);
-						//printf("[SERVO12C] RAD conversion value %d: %.4f \n", i, _conversion_values[i]);
+//						printf("[SERVO12C] RAD SERVO_P1_ABS %d: %.4f \n", i, _calibration_values.SERVO_P1_ABS[i]);
+//						printf("[SERVO12C] RAD SERVO_P2_ABS %d: %.4f \n", i, _calibration_values.SERVO_P2_ABS[i]);
+//						printf("[SERVO12C] RAD SERVO_P1_RAD %d: %.4f \n", i, _calibration_values.SERVO_P1_RAD[i]);
+//						printf("[SERVO12C] RAD SERVO_P2_RAD %d: %.4f \n", i, _calibration_values.SERVO_P2_RAD[i]);
+//						printf("[SERVO12C] RAD conversion value %d: %.4f \n", i, _conversion_values[i]);
 					}
 					return OK;
 
@@ -440,10 +440,9 @@ SERVO12C::read(struct file *filp, char *buffer, size_t buflen)
 
 }
 
-int
+inline int
 SERVO12C::set_servo_values()
 {
-	uint8_t i;
 	int ret;
 
 	/*
@@ -457,6 +456,7 @@ SERVO12C::set_servo_values()
 		log("i2c::transfer returned %d", ret);
 	}
 	else {
+		uint8_t i;
 		for (i = 0; i < SERVOS_ATTACHED; i++) {
 			_current_values[i] = _val[i];
 		}
@@ -484,7 +484,7 @@ SERVO12C::convert(float conv, uint8_t servo)
 
 
 			//printf("[SERVO12C] ABS conv: %.4f \n", conv);
-			//printf("[SERVO12C] ret: %d \n", ret);
+			//printf("[SERVO12C] ret: %.2f \n", ret);
 
 			return (uint8_t) conv;
 
@@ -500,10 +500,12 @@ SERVO12C::convert(float conv, uint8_t servo)
 			ret = _calibration_values.SERVO_P1_ABS[servo] + _conversion_values[servo] * (conv - _calibration_values.SERVO_P1_DEG[servo]);
 
 			//printf("DEG [SERVO12C] conv: %.4f \n", conv);
-			//printf("[SERVO12C] ret: %d \n", ret);
+			//printf("[SERVO12C] ret: %.2f \n", ret);
 
 			return (uint8_t) roundf(ret);
 		case RAD:
+
+//			printf("[SERVO12C] RAD conv: %.4f \n", conv);
 
 			if (conv < SERVO_MIN_RAD[servo]) {
 				return (uint8_t) SERVO_MIN_ABS[servo];
@@ -514,8 +516,8 @@ SERVO12C::convert(float conv, uint8_t servo)
 
 			ret = _calibration_values.SERVO_P1_ABS[servo] + _conversion_values[servo] * (conv - _calibration_values.SERVO_P1_RAD[servo]);
 
-			//printf("[SERVO12C] RAD conv: %.4f \n", conv);
-			//printf("[SERVO12C] ret: %d \n", ret);
+//			printf("[SERVO12C] RAD conv: %.4f \n", conv);
+//			printf("[SERVO12C] ret: %.2f \n", ret);
 			return (uint8_t) roundf(ret);
 			/* other input types are not supported */
 		default:
@@ -526,84 +528,84 @@ SERVO12C::convert(float conv, uint8_t servo)
 
 }
 
-float
-SERVO12C::convert_back(uint8_t conv, uint8_t servo)
-{
-	float ret;
+//float
+//SERVO12C::convert_back(uint8_t conv, uint8_t servo)
+//{
+//	float ret;
+//
+//	switch (_input_type) {
+//
+//
+//		case ABS:
+//
+//
+//			//printf("[SERVO12C] Convert back ABS:");
+//			//printf("[SERVO12C] conv: %d \n", conv);
+//			//printf("[SERVO12C] ret: %.4f \n", (float) conv);
+//			return (float) conv;
+//		case DEG:
+//
+//			ret = _calibration_values.SERVO_P1_DEG[servo] + ((float) conv - _calibration_values.SERVO_P1_ABS[servo]) / _conversion_values[servo];
+//
+//			//printf("[SERVO12C] Convert back DEG:");
+//			//printf("[SERVO12C] conv: %d \n", conv);
+//			//printf("[SERVO12C] ret: %.4f \n", ret);
+//
+//			return ret;
+//		case RAD:
+//
+//			ret = _calibration_values.SERVO_P1_RAD[servo] + ((float) conv - _calibration_values.SERVO_P1_ABS[servo]) / _conversion_values[servo];
+//
+//			//printf("[SERVO12C] Convert back RAD:");
+//			//printf("[SERVO12C] conv: %d \n", conv);
+//			//printf("[SERVO12C] ret: %.4f \n", ret);
+//
+//			return ret;
+//			/* other input types are not supported */
+//		default:
+//			return 127.0f;
+//
+//
+//		}
+//
+//}
 
-	switch (_input_type) {
-
-
-		case ABS:
-
-
-			//printf("[SERVO12C] Convert back ABS:");
-			//printf("[SERVO12C] conv: %d \n", conv);
-			//printf("[SERVO12C] ret: %.4f \n", (float) conv);
-			return (float) conv;
-		case DEG:
-
-			ret = _calibration_values.SERVO_P1_DEG[servo] + ((float) conv - _calibration_values.SERVO_P1_ABS[servo]) / _conversion_values[servo];
-
-			//printf("[SERVO12C] Convert back DEG:");
-			//printf("[SERVO12C] conv: %d \n", conv);
-			//printf("[SERVO12C] ret: %.4f \n", ret);
-
-			return ret;
-		case RAD:
-
-			ret = _calibration_values.SERVO_P1_RAD[servo] + ((float) conv - _calibration_values.SERVO_P1_ABS[servo]) / _conversion_values[servo];
-
-			//printf("[SERVO12C] Convert back RAD:");
-			//printf("[SERVO12C] conv: %d \n", conv);
-			//printf("[SERVO12C] ret: %.4f \n", ret);
-
-			return ret;
-			/* other input types are not supported */
-		default:
-			return 127.0f;
-
-
-		}
-
-}
-
-void SERVO12C::calculate_speed(float speed, uint8_t servo)
-{
-	if(speed != _current_speed[servo]) {
-		int speed10, speedi;
-		uint8_t i;
-
-		_current_speed[servo] = speed;
-
-		//log("speed (before conversion) : %.4f", (double) speed);
-		// Convert from DEG or RAD to ABS:
-		speed = speed*_conversion_values[servo];
-
-		// speed is per second. Want it per 50 ms.
-		speedi = (int)roundf(speed / 20.0f);
-
-		//log("speed (after conversion) : %d", speedi);
-
-		// Maximum speed is 6 ABS per 0.01 seconds:
-		if(speedi > 30) {
-			speedi = 30;
-		}
-
-		speed10 = speedi / 5;
-
-		for (i = 0; i < 5; i++) {
-			_speed[servo][i] = speed10;
-		}
-
-		for (i = 0; speedi >= speed10*5 + (i+1); i++) {
-			_speed[servo][i]++;
-		}
-
-		// Reset the counter
-		_speed_count[servo] = 0;
-	}
-}
+//void SERVO12C::calculate_speed(float speed, uint8_t servo)
+//{
+//	if(speed != _current_speed[servo]) {
+//		int speed10, speedi;
+//		uint8_t i;
+//
+//		_current_speed[servo] = speed;
+//
+//		//log("speed (before conversion) : %.4f", (double) speed);
+//		// Convert from DEG or RAD to ABS:
+//		speed = speed*_conversion_values[servo];
+//
+//		// speed is per second. Want it per 50 ms.
+//		speedi = (int)roundf(speed / 20.0f);
+//
+//		//log("speed (after conversion) : %d", speedi);
+//
+//		// Maximum speed is 6 ABS per 0.01 seconds:
+//		if(speedi > 30) {
+//			speedi = 30;
+//		}
+//
+//		speed10 = speedi / 5;
+//
+//		for (i = 0; i < 5; i++) {
+//			_speed[servo][i] = speed10;
+//		}
+//
+//		for (i = 0; speedi >= speed10*5 + (i+1); i++) {
+//			_speed[servo][i]++;
+//		}
+//
+//		// Reset the counter
+//		_speed_count[servo] = 0;
+//	}
+//}
 
 int SERVO12C::parameters_init(struct servo_param_handles& h)
 {
@@ -687,10 +689,10 @@ SERVO12C::task_cycle()
 	/* Subscribe to the servo12c_control topic */
 	_servo_control_topic = orb_subscribe(ORB_ID(servo12c_control));
 
-	for(i = 0; i < SERVOS_ATTACHED; i++) {
-		_positions.values[i] = 1.0f;
-	}
-	orb_advert_t servo_pos_pub = orb_advertise(ORB_ID(servo12c_position), &_positions);
+//	for(i = 0; i < SERVOS_ATTACHED; i++) {
+//		_positions.values[i] = 1.0f;
+//	}
+//	orb_advert_t servo_pos_pub = orb_advertise(ORB_ID(servo12c_position), &_positions);
 
 	pollfd fds[1];
 	fds[0].fd = _servo_control_topic;
@@ -703,13 +705,13 @@ SERVO12C::task_cycle()
 	while (!_task_exit) {
 		uint8_t i;
 		int diff;
-		if (_timestamp == 0) {
-			hrt_store_absolute_time(&_timestamp);
-		}
-		_timestamp += 10000;
+//		if (_timestamp == 0) {
+//			hrt_store_absolute_time(&_timestamp);
+//		}
+//		_timestamp += 10000;
 
 		/* sleep waiting for data, but no more than a second */
-		int ret = ::poll(&fds[0], 1, 0);
+		int ret = ::poll(&fds[0], 1, 1000);
 
 		/* this would be bad... */
 		if (ret < 0) {
@@ -737,9 +739,11 @@ SERVO12C::task_cycle()
 
 			for (i = 0; i < SERVOS_ATTACHED; i++) {
 
-				_target[i] = _controls.set_value[i] ? convert(_controls.values[i], i) : _current_values[i];
+//				_target[i] = _controls.set_value[i] ? convert(_controls.values[i], i) : _current_values[i];
 
-				calculate_speed(_controls.speed[i], i);
+				_val[i] = _controls.set_value[i] ? convert(_controls.values[i], i) : _current_values[i];
+
+//				calculate_speed(_controls.speed[i], i);
 			}
 //			log("target: %d \n", _target[0]);
 
@@ -747,53 +751,53 @@ SERVO12C::task_cycle()
 //				log("speed %d: %d \n", i, _speed[1][i]);
 //			}
 
-
+			set_servo_values();
 
 		}
-
-		uint8_t val_changed;
-		val_changed = 2;
-
-		for (i = 0; i < SERVOS_ATTACHED; i++) {
-			diff = (int)_target[i] - (int)_current_values[i];
-			if (diff == 0) {
-				val_changed--;
-			}
-
-			if ((abs(diff) < _speed[i][_speed_count[i]])) {
-				_val[i] = _target[i];
-			} else {
-				_val[i] = (diff > 0) ? _current_values[i] + _speed[i][_speed_count[i]] : _current_values[i] - _speed[i][_speed_count[i]];
-//				log("diff: %d", diff);
-//				log("current_values %d: %d",i,_current_values[i]);
-//				log("val %d: %d",i,_val[i]);
-			}
-			_speed_count[i] = (_speed_count[i] == 4) ? 0 : _speed_count[i] + 1;
-		}
+//
+//		uint8_t val_changed;
+//		val_changed = 2;
+//
+//		for (i = 0; i < SERVOS_ATTACHED; i++) {
+//			diff = (int)_target[i] - (int)_current_values[i];
+//			if (diff == 0) {
+//				val_changed--;
+//			}
+//
+//			if ((abs(diff) < _speed[i][_speed_count[i]])) {
+//				_val[i] = _target[i];
+//			} else {
+//				_val[i] = (diff > 0) ? _current_values[i] + _speed[i][_speed_count[i]] : _current_values[i] - _speed[i][_speed_count[i]];
+////				log("diff: %d", diff);
+////				log("current_values %d: %d",i,_current_values[i]);
+////				log("val %d: %d",i,_val[i]);
+//			}
+//			_speed_count[i] = (_speed_count[i] == 4) ? 0 : _speed_count[i] + 1;
+//		}
 
 //		for (i = 0; i < 5; i++) {
 //			log("speed %d: %d \n", i, _speed[0][i]);
 //		}
 
 		// To avoid jittering servos
-		if (val_changed != 0) {
-			set_servo_values();
-		}
-
-		if(hrt_absolute_time() > _timestamp) {
-//			log("%llu", hrt_elapsed_time(&_timestamp));
-			hrt_store_absolute_time(&_timestamp);
-		}
-
-		for(i = 0; i < SERVOS_ATTACHED; i++) {
-			_positions.values[i] = convert_back(_current_values[i], i);
-		}
-		orb_publish(ORB_ID(servo12c_position), servo_pos_pub, &_positions);
-
-		while(_timestamp > hrt_absolute_time()) { //hrt_elapsed_time(&_timestamp) < 10000) {
-			//log("Timestamp is larger: %llu", _timestamp - hrt_absolute_time());
-			usleep(1000);
-		}
+//		if (val_changed != 0) {
+//			set_servo_values();
+//		}
+//
+//		if(hrt_absolute_time() > _timestamp) {
+////			log("%llu", hrt_elapsed_time(&_timestamp));
+//			hrt_store_absolute_time(&_timestamp);
+//		}
+//
+//		for(i = 0; i < SERVOS_ATTACHED; i++) {
+//			_positions.values[i] = convert_back(_current_values[i], i);
+//		}
+//		orb_publish(ORB_ID(servo12c_position), servo_pos_pub, &_positions);
+//
+//		while(_timestamp > hrt_absolute_time()) { //hrt_elapsed_time(&_timestamp) < 10000) {
+//			//log("Timestamp is larger: %llu", _timestamp - hrt_absolute_time());
+//			usleep(1000);
+//		}
 
 	}
 
