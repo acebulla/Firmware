@@ -236,7 +236,7 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 	float diff;
 	bool target_reached[2] = {true, true};
 
-	uint8_t loopCount = 0;
+	uint8_t loopCount = 1;
 	bool first = true;
 
 
@@ -274,23 +274,50 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 //			dt = 0.0f;
 //		}
 		if (loopCount == 3 && !first) {
+			/* Already synchronized */
+
+			/* Wait at most 14 ms for a new message */
 			for(i = 0; i < 7 && !new_marker_loc; i++) {
 				usleep(2000);
 				orb_check(marker_location_sub, &new_marker_loc);
 			}
 
-			printf("1: i = %d\n", i);
+			//printf("1: i = %d\n", i);
 
 			if (!new_marker_loc) {
 				/* Lost marker */
-				printf("2\n");
+				//printf("2\n");
 				first = true;
 			}
 
 			loopCount = 1;
 
+
 		} else if (first) {
+			/* Synchronization:  */
+
+			/* Check for new message */
 			orb_check(marker_location_sub, &new_marker_loc);
+
+			if (new_marker_loc) {
+				/* Throw first message away */
+
+				/* clear updated flag */
+				orb_copy(ORB_ID(marker_location), marker_location_sub, &marker_loc);
+
+				for(i = 0; i < 17 && !new_marker_loc; i++) {
+					usleep(2000);
+					orb_check(marker_location_sub, &new_marker_loc);
+				}
+
+				if(new_marker_loc) {
+					/* Synchronized */
+					first = false;
+					loopCount = 1;
+				} else {
+					first = true;
+				}
+			}
 		}
 
 		if (new_marker_loc) {
@@ -298,43 +325,15 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 			/* clear updated flag */
 			orb_copy(ORB_ID(marker_location), marker_location_sub, &marker_loc);
 
-			/* Synchronization: Throw first message away */
-			if(first) {
-				printf("3\n");
-				for(i = 0; i < 17 && !new_marker_loc; i++) {
-					usleep(2000);
-					orb_check(marker_location_sub, &new_marker_loc);
-				}
-
-				printf("4\n");
-
-				if (new_marker_loc) {
-					/* Synchronized */
-					first = false;
-					/* clear updated flag */
-					orb_copy(ORB_ID(marker_location), marker_location_sub, &marker_loc);
-
-					printf("5\n");
-				} else {
-					/* Lost marker */
-					first = true;
-					printf("6\n");
-					goto exit;
-				}
-			} else {
-				orb_check(marker_location_sub, &new_marker_loc);
-			}
-
-			printf("%llu \n", hrt_absolute_time());
-			printf("%d \n", new_marker_loc);
+//			printf("%llu \n", hrt_absolute_time());
 
 
 			/* calculate position */
 			tmp = pos_pid_calculate(&pan_pos_pid, 0.0f, marker_loc.pan, dt);
 
-			if (fabs(tmp) > max_speed) {
+			if (fabs(tmp) > max_speed * 2.0f) {
 				// (target[0] > 0) - (target[0] < 0) gives the sign.
-				current_pos[0] = current_pos[0] + (float)( (tmp > 0) - (tmp < 0) ) * max_speed;
+				current_pos[0] = current_pos[0] + (float)( (tmp > 0) - (tmp < 0) ) * max_speed * 2.0f;
 			} else {
 				current_pos[0] = current_pos[0] + tmp;
 			}
@@ -347,9 +346,9 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 
 			tmp = pos_pid_calculate(&tilt_pos_pid, 0.0f, marker_loc.tilt, dt);
 
-			if (fabs(tmp) > max_speed) {
+			if (fabs(tmp) > max_speed * 2.0f) {
 				// (target[0] > 0) - (target[0] < 0) gives the sign.
-				current_pos[1] = current_pos[1] + (float)( (tmp > 0) - (tmp < 0) ) * max_speed;
+				current_pos[1] = current_pos[1] + (float)( (tmp > 0) - (tmp < 0) ) * max_speed * 2.0f;
 			} else {
 				current_pos[1] = current_pos[1] + tmp;
 			}
@@ -362,8 +361,6 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 
 		}
 
-
-exit:
 
 		/* Correct for change of quadrotor's attitude */
 		orb_copy(ORB_ID(vehicle_attitude), attitude_sub, &attitude_s); // Assume we always get data
@@ -409,6 +406,11 @@ exit:
 		if (loopCount < 3) {
 			usleep(10000);
 			loopCount++;
+		} else {
+			loopCount = 1;
+			if (first) {
+				usleep(10000);
+			}
 		}
 	}
 
