@@ -7,18 +7,26 @@
 	<messages>
 		<message id="211" name="MARKER_LOCATION">
                        <description>The location of the marker.</description>
+                       <field type="uint64_t" name="timestamp">A timestamp which indicates when the measurement was taken.</field>
                        <field type="uint8_t" name="marker_id">The id of the marker.</field>
                        <field type="float[3]" name="pos_xyz">The xyz vector to the midpoint of the marker.</field>
                        <field type="float" name="pan">The pan angle.</field>
                        <field type="float" name="tilt">The tilt angle.</field>
+                       <field type="float" name="roll">The roll angle.</field>
+                       <field type="float" name="pitch">The pitch angle.</field>
+                       <field type="float" name="yaw">The yaw angle.</field>
 		</message>
 		<message id="212" name="MARKER_LOCATION_FULL">
                        <description>The location of the marker + rotation matrix.</description>
+                       <field type="uint64_t" name="timestamp">A timestamp which indicates when the measurement was taken.</field>
                        <field type="uint8_t" name="marker_id">The id of the marker.</field>
                        <field type="float[9]" name="roation_mat">The rotationo matrix.</field>
                        <field type="float[3]" name="pos_xyz">The xyz vector to the midpoint of the marker.</field>
                        <field type="float" name="pan">The pan angle.</field>
                        <field type="float" name="tilt">The tilt angle.</field>
+                       <field type="float" name="roll">The roll angle.</field>
+                       <field type="float" name="pitch">The pitch angle.</field>
+                       <field type="float" name="yaw">The yaw angle.</field>
 		</message>
 	</messages>
 </mavlink>

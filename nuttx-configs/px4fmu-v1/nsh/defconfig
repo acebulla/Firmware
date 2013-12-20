@@ -901,7 +901,7 @@ CONFIG_NSH_CONSOLE=y
 # CONFIG_NSH_USBCONSOLE is not set
 
 #
-# USB Trace Support
+# USB Trace Support ..
 #
 # CONFIG_NSH_CONDEV is not set
 CONFIG_NSH_ARCHINIT=y

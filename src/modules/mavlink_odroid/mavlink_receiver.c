@@ -102,13 +102,16 @@ handle_message(mavlink_message_t *msg)
 
 		struct marker_location_s f;
 
-		f.timestamp = hrt_absolute_time();
+		f.timestamp = marker_pos.timestamp;
 		f.marker_id = marker_pos.marker_id;
 		f.pos_xyz[0] = marker_pos.pos_xyz[0];
 		f.pos_xyz[1] = marker_pos.pos_xyz[1];
 		f.pos_xyz[2] = marker_pos.pos_xyz[2];
 		f.pan = marker_pos.pan;
 		f.tilt = marker_pos.tilt;
+		f.pitch = marker_pos.pitch;
+		f.yaw = marker_pos.yaw;
+		f.roll = marker_pos.roll;
 
 		/* check if topic is advertised */
 		if (marker_pub <= 0) {

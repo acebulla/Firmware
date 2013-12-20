@@ -62,31 +62,97 @@ extern "C" { __EXPORT int interface_test_main(int argc, char *argv[]); }
 
 int interface_test_main(int argc, char *argv[])
 {
-	int i;
+	FILE *fp;
+	int i, size;
 	uint8_t addri = 0, addrcount = 0;
 	uint8_t * addr;
+	char word[5];
+	char * buffer;
+	size_t result;
 
-	if (argc > 3 && (strcmp(argv[2], "-a") == 0 || strcmp(argv[2], "--addrgroups") == 0)) {
-		addrcount = atoi(argv[3]);
-		printf("addrcount: %d\n", addrcount);
-		if (addrcount <= MAX_ADDR_COUNT) {
-			addr = new uint8_t[addrcount];
-			for (i = 4; i < argc; i++) {
-				if (strcmp(argv[i], ",") == 0) {
-					addr[addri-1] |= GROUPEND;
-					printf("%X \n", addr[addri-1]);
-					continue;
-				}
+	if ((fp = fopen("/fs/microsd/mb12xxSensors","r")) < 0) {
+		printf("Error opening file\n");
+		return -1;
+	}
 
-				addr[addri] = (uint8_t) atoi(argv[i]);
-				printf("addri: %d\t addr: %d \n", addri, addr[addri]);
-				addri++;
+	// obtain file size:
+	  fseek(fp , 0 , SEEK_END);
+	  size = ftell(fp);
+	  rewind (fp);
+
+	  // allocate memory to contain the whole file:
+	   buffer = (char*) malloc (sizeof(char)*size);
+	   if (buffer == NULL) {
+		   printf("Error allocating memory\n");
+		   fclose (fp);
+		   return -1;
+	   }
+
+	   // copy the file into the buffer:
+	     result = fread (buffer,1,size,fp);
+	     if (result != size) {
+	    	 printf("Error reading file\n");
+	    	 fclose (fp);
+	    	 free (buffer);
+	    	 return -1;
+	     }
+
+//	     printf("%s \n", buffer);
+
+
+	sscanf(buffer, "%s%n", &word, &i);
+	addrcount = atoi(word);
+	buffer += i;
+	printf("%s \n", word);
+	printf("%d \n", i);
+	printf("addrcount: %d \n", addrcount);
+
+//	sscanf(buffer, "%s%n", &word, &i);
+//	buffer += i;
+//	printf("%s \n", word);
+//	printf("%d \n", i);
+
+	if (addrcount <= MAX_ADDR_COUNT) {
+		addr = new uint8_t[addrcount];
+		while ((sscanf(buffer, "%s%n", &word, &i) > 0) && (addri < addrcount)){
+			if (strcmp(word, ",") == 0) {
+				addr[addri-1] |= GROUPEND;
+				printf("%X \n", addr[addri-1]);
+				buffer += i;
+				continue;
 			}
 
-			/* Last address must be the end of a group in any case. */
-			addr[addri-1] |= GROUPEND;
+			addr[addri] = (uint8_t) atoi(word);
+			printf("addri: %d\t addr: %d \n", addri, addr[addri]);
+			buffer += i;
+			addri++;
 		}
+
+		/* Last address must be the end of a group in any case. */
+		addr[addri-1] |= GROUPEND;
 	}
+
+//	if (argc > 3 && (strcmp(argv[2], "-a") == 0 || strcmp(argv[2], "--addrgroups") == 0)) {
+//		addrcount = atoi(argv[3]);
+//		printf("addrcount: %d\n", addrcount);
+//		if (addrcount <= MAX_ADDR_COUNT) {
+//			addr = new uint8_t[addrcount];
+//			for (i = 4; i < argc; i++) {
+//				if (strcmp(argv[i], ",") == 0) {
+//					addr[addri-1] |= GROUPEND;
+//					printf("%X \n", addr[addri-1]);
+//					continue;
+//				}
+//
+//				addr[addri] = (uint8_t) atoi(argv[i]);
+//				printf("addri: %d\t addr: %d \n", addri, addr[addri]);
+//				addri++;
+//			}
+//
+//			/* Last address must be the end of a group in any case. */
+//			addr[addri-1] |= GROUPEND;
+//		}
+//	}
 
 	for (i = 0; i < addrcount; i++) {
 		printf("%d", (addr[i] & ADDRPART));
@@ -94,6 +160,8 @@ int interface_test_main(int argc, char *argv[])
 			printf("\n");
 		}
 	}
+
+	fclose(fp);
 
 	return OK;
 }

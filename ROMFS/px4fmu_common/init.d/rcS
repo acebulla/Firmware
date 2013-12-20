@@ -112,6 +112,20 @@ then
 	# Start the Commander (needs to be this early for in-air-restarts)
 	#
 	commander start
+	
+	#############################################################
+	# Start sensors
+	sh /etc/init.d/rc.sensors
+
+	# Start one of the estimators
+	attitude_estimator_ekf start
+	
+	# Start mavlink
+	mavlink start -d /dev/ttyS2
+	
+	# Start custom mavlink
+	mavlink_odroid start -d /dev/ttyS1 -b 115200
+	##############################################################
 
 	if param compare SYS_AUTOSTART 1000
 	then
@@ -352,7 +366,7 @@ then
 	fi
 	
 	# If none of the autostart scripts triggered, get a minimal setup
-	if [ $MODE == autostart ]
+	if [ "$MODE" == "autostart" ]
 	then
 		# Telemetry port is on both FMU boards ttyS1
 		# but the AR.Drone motors can be get 'flashed'
@@ -361,6 +375,21 @@ then
 	
 		# Start commander
 		commander start
+		
+	        # Start sensors
+		sh /etc/init.d/rc.sensors
+	
+		# Start one of the estimators
+		attitude_estimator_ekf start
+	
+		# Start GPS
+		gps start
+		
+		# Start mavlink
+		mavlink start -d /dev/ttyS2
+		
+		# Start custom mavlink
+		mavlink_odroid start -d /dev/ttyS1 -b 115200
 	
 		# Start px4io if present
 		if px4io detect
@@ -372,15 +401,6 @@ then
 				echo "FMU driver (no PWM) started"
 			fi
 		fi
-	
-		# Start sensors
-		sh /etc/init.d/rc.sensors
-	
-		# Start one of the estimators
-		attitude_estimator_ekf start
-	
-		# Start GPS
-		gps start
 	
 	fi
 

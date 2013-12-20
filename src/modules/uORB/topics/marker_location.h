@@ -28,10 +28,13 @@
 
 struct marker_location_s
 {
- uint64_t timestamp;		/**< in microseconds since system start          */
+ uint64_t timestamp;		///< in microseconds, indicates approximately when the measurement was taken.
  float pos_xyz[3]; ///< The xyz vector to the midpoint of the marker.
  float pan; ///< The pan angle.
  float tilt; ///< The tilt angle.
+ float pitch; ///< The pitch angle.
+ float roll; ///< The roll angle.
+ float yaw; ///< The yaw angle.
  uint8_t marker_id; ///< The id of the marker.
 };
 

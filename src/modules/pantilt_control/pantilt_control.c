@@ -281,6 +281,8 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 			/* clear updated flag */
 			orb_copy(ORB_ID(marker_location), marker_location_sub, &marker_loc);
 
+//			printf("time: %llu \n", marker_loc.timestamp);
+
 			//printf("pan: %.2f \n", marker_loc.pan);
 			//printf("tilt: %.2f \n", marker_loc.tilt);
 
@@ -293,11 +295,11 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 
 
 			/* Limit calculated speed to max_speed */
-			if (current_speed[0] > max_speed) { current_speed[0] = max_speed; printf("max_speed\n"); }
-			if (current_speed[0] < -max_speed) { current_speed[0] = -max_speed; printf("max_speed\n"); }
+			if (current_speed[0] > max_speed) { current_speed[0] = max_speed; }
+			if (current_speed[0] < -max_speed) { current_speed[0] = -max_speed; }
 
-			if (current_speed[1] > max_speed) { current_speed[1] = max_speed; printf("max_speed\n"); }
-			if (current_speed[1] < -max_speed) { current_speed[1] = -max_speed; printf("max_speed\n"); }
+			if (current_speed[1] > max_speed) { current_speed[1] = max_speed; }
+			if (current_speed[1] < -max_speed) { current_speed[1] = -max_speed; }
 
 //			printf("speed 0: %.2f \n", current_speed[0]);
 //			printf("speed 1: %.2f \n", current_speed[1]);
