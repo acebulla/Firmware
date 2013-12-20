@@ -205,7 +205,6 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 
 	for (i = 0; i < SERVOS_ATTACHED; i++) {
 		servo_control.set_value[i] = 1;
-		servo_control.speed[i] = 7.8f;
 		servo_control.values[i] = start_pos;
 	}
 
@@ -224,9 +223,6 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 
 	hrt_abstime t_prev = 0;
 
-	pos_pid_t pan_pos_pid;
-	pos_pid_t tilt_pos_pid;
-
 	speed_pid_t pan_vel_pid;
 	speed_pid_t tilt_vel_pid;
 
@@ -238,22 +234,15 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 	parameters_update(&params_h, &params);
 
 
-
-	pos_pid_init(&pan_pos_pid, params.pan_pos_KP, params.pan_pos_KI, params.pan_pos_KD, -error_band, error_band, POS_PID_MODE_DERIVATIV_CALC, 0.02f);
-	pos_pid_init(&tilt_pos_pid, params.tilt_pos_KP, params.tilt_pos_KI, params.tilt_pos_KD, -error_band, error_band, POS_PID_MODE_DERIVATIV_CALC, 0.02f);
-
 	servo_position_f current_pos[2] = {start_pos, start_pos};
-	servo_position_f target[2] = {start_pos, start_pos};
 	float current_speed[2] = {0.0f, 0.0f};
 
 	speed_pid_init(&pan_vel_pid, params.pan_vel_KP, params.pan_vel_KI, params.pan_vel_KD, -error_band, error_band, SPEED_PID_MODE_DERIVATIV_CALC, 0.02f);
 	speed_pid_init(&tilt_vel_pid, params.tilt_vel_KP, params.tilt_vel_KI, params.tilt_vel_KD, -error_band, error_band, SPEED_PID_MODE_DERIVATIV_CALC, 0.02f);
 
-	float diff;
 	bool target_reached[2];
 
-	float quad_pos = 0;
-	uint8_t integral_count = 0;
+	int loops_since_last_msg = 0;
 
 
 	while (!thread_should_exit) {
@@ -268,12 +257,9 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 			/* update params */
 			parameters_update(&params_h, &params);
 
-
-			pos_pid_set_parameters(&pan_pos_pid,  params.pan_pos_KP, params.pan_pos_KI, params.pan_pos_KD, -error_band, error_band);
-			pos_pid_set_parameters(&tilt_pos_pid,  params.tilt_pos_KP, params.tilt_pos_KI, params.tilt_pos_KD, -error_band, error_band);
-
 			speed_pid_set_parameters(&pan_vel_pid, params.pan_vel_KP, params.pan_vel_KI, params.pan_vel_KD, -error_band, error_band);
 			speed_pid_set_parameters(&tilt_vel_pid,params.tilt_vel_KP, params.tilt_vel_KI, params.tilt_vel_KD, -error_band, error_band);
+			//printf("Updated\n");
 		}
 
 
@@ -295,81 +281,48 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 			/* clear updated flag */
 			orb_copy(ORB_ID(marker_location), marker_location_sub, &marker_loc);
 
-			/* record position of quadrotor: */
-			orb_copy(ORB_ID(vehicle_attitude), attitude_sub, &attitude_s); // Assume we always get date
-
-
-			/* calculate position */
-			target[0] = current_pos[0] + pos_pid_calculate(&pan_pos_pid, 0.0f, marker_loc.pan, dt);
-			target[1] = current_pos[1] + pos_pid_calculate(&tilt_pos_pid, 0.0f, marker_loc.tilt, dt);
+			//printf("pan: %.2f \n", marker_loc.pan);
+			//printf("tilt: %.2f \n", marker_loc.tilt);
 
 			/* calculate speed */
 			current_speed[0] = speed_pid_calculate(&pan_vel_pid, 0.0f, marker_loc.pan, dt);
 			current_speed[1] = speed_pid_calculate(&tilt_vel_pid, 0.0f, marker_loc.tilt, dt);
 
-			if (current_speed[0] > max_speed) { current_speed[0] = max_speed; }
-			if (current_speed[0] < -max_speed) { current_speed[0] = -max_speed; }
+			//printf("speed 0: %.5f \n", current_speed[0]);
+			//printf("speed 1: %.5f \n", current_speed[1]);
 
-			if (current_speed[1] > max_speed) { current_speed[1] = max_speed; }
-			if (current_speed[1] < -max_speed) { current_speed[1] = -max_speed; }
 
-//			if (pan_p < 0) {
-//				servo_control.set_value[0] = 1;
-//				servo_control.speed[0] = -pan_p;
-//				servo_control.values[0] = 0.0f;
-//			} else {
-//				servo_control.set_value[0] = 1;
-//				servo_control.speed[0] = pan_p;
-//				servo_control.values[0] = 255.0f;
-//			}
-//
-//			if (tilt_p < 0) {
-//				servo_control.set_value[1] = 1;
-//				servo_control.speed[1] = -tilt_p;
-//				servo_control.values[1] = 0.0f;
-//			} else {
-//				servo_control.set_value[1] = 1;
-//				servo_control.speed[1] = tilt_p;
-//				servo_control.values[1] = 255.0f;
-//			}
+			/* Limit calculated speed to max_speed */
+			if (current_speed[0] > max_speed) { current_speed[0] = max_speed; printf("max_speed\n"); }
+			if (current_speed[0] < -max_speed) { current_speed[0] = -max_speed; printf("max_speed\n"); }
 
-//			servo_control.set_value[0] = 1;
-//			servo_control.speed[0] = fabs(pan_s);
-//			servo_control.values[0] = pan_p;
-//
-//			servo_control.set_value[1] = 1;
-//			servo_control.speed[1] = fabs(tilt_s);
-//			servo_control.values[1] = tilt_p;
+			if (current_speed[1] > max_speed) { current_speed[1] = max_speed; printf("max_speed\n"); }
+			if (current_speed[1] < -max_speed) { current_speed[1] = -max_speed; printf("max_speed\n"); }
 
+//			printf("speed 0: %.2f \n", current_speed[0]);
+//			printf("speed 1: %.2f \n", current_speed[1]);
+
+			loops_since_last_msg = 0;
+		}
+
+		if (loops_since_last_msg > 4) {
+			/* No new marker location for 50 ms. Assume we lost the marker. */
+			current_speed[0] = 0.0f; current_speed[1] = 0.0f;
 		}
 
 		for (i = 0; i < SERVOS_ATTACHED; i++) {
-			if (target[i] > SERVO_MAX_RAD[i]) {
-				target[i] = SERVO_MAX_RAD[i];
-			} else if (target[i] < SERVO_MIN_RAD[i]) {
-				target[i] = SERVO_MIN_RAD[i];
-			}
-		}
 
-		for (i = 0; i < SERVOS_ATTACHED; i++) {
-			diff = target[i] - current_pos[i];
-
-			if (diff == 0) {
+			if (current_speed[i] == 0.0f) {
 				target_reached[i] = true;
 				servo_control.set_value[i] = 0;
-				continue;
-			}
-
-			if (fabs(diff) < fabs(current_speed[i])) {
-				current_pos[i] = target[i];
 			} else {
 				current_pos[i] = current_pos[i] + current_speed[i];
+
+				target_reached[i] = false;
+
+				servo_control.values[i] = current_pos[i];
+				servo_control.set_value[i] = 1;
 			}
-
-			target_reached[i] = false;
-
-			servo_control.values[i] = current_pos[i];
-			servo_control.set_value[i] = 1;
 		}
 
 		/* Correct for change of quadrotor's attitude */
@@ -389,6 +342,15 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 			target_reached[1] = false;
 		}
 
+		/* Check that current_pos is not set to a location, which the servo cannot reach. */
+		for (i = 0; i < SERVOS_ATTACHED; i++) {
+			if (current_pos[i] > SERVO_MAX_RAD[i]) {
+				current_pos[i] = SERVO_MAX_RAD[i];
+			} else if (current_pos[i] < SERVO_MIN_RAD[i]) {
+				current_pos[i] = SERVO_MIN_RAD[i];
+			}
+		}
+
 
 		if (!(target_reached[0] && target_reached[1]) ) {
 			orb_publish(ORB_ID(servo12c_control), servo_control_pub, &servo_control);
@@ -401,6 +363,7 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 
 		/* run at approximately 30 Hz */
 		// usleep(34000);
+		loops_since_last_msg++;
 		usleep(10000);
 	}
 
