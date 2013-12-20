@@ -877,6 +877,76 @@ mb12xx_main(int argc, char *argv[])
 			return OK;
 		}
 
+		if (argc > 2 && (strcmp(argv[2], "-f") == 0 || strcmp(argv[2], "--file") == 0)) {
+			FILE *fp;
+			int i, size;
+			char word[5];
+			char * buffer;
+			size_t result;
+
+			if ((fp = fopen("/fs/microsd/mb12xxSensors","r")) < 0) {
+				printf("Error opening file\n");
+				return -1;
+			}
+
+			// obtain file size:
+			fseek(fp , 0 , SEEK_END);
+			size = ftell(fp);
+			rewind (fp);
+
+			// allocate memory to contain the whole file:
+			buffer = (char*) malloc (sizeof(char)*size);
+			if (buffer == NULL) {
+			   printf("Error allocating memory\n");
+			   fclose (fp);
+			   return -1;
+			}
+
+			// copy the file into the buffer:
+			result = fread (buffer,1,size,fp);
+			if (result != size) {
+				 printf("Error reading file\n");
+				 fclose (fp);
+				 free (buffer);
+				 return -1;
+			}
+
+
+			sscanf(buffer, "%s%n", &word, &i);
+			addrcount = atoi(word);
+			buffer += i;
+
+			if (addrcount <= MAX_SENSOR_COUNT) {
+				addr = new uint8_t[addrcount];
+				while ((sscanf(buffer, "%s%n", &word, &i) > 0) && (addri < addrcount)){
+					if (strcmp(word, ",") == 0) {
+						addr[addri-1] |= GROUPEND;
+						buffer += i;
+						continue;
+					}
+
+					addr[addri] = (uint8_t) atoi(word);
+					buffer += i;
+					addri++;
+				}
+
+				/* Last address must be the end of a group in any case. */
+				addr[addri-1] |= GROUPEND;
+			}
+
+			fclose (fp);
+
+//			for (i = 0; i < addrcount; i++) {
+//				printf("%d", (addr[i] & ADDRPART));
+//				if (addr[i] & GROUPEND) {
+//					printf("\n");
+//				}
+//			}
+
+			mb12xx::start(addr, addrcount);
+			return OK;
+		}
+
 		addrcount = 1;
 		addr = new uint8_t[addrcount];
 		addr[0] = MB12XX_BASEADDR | GROUPEND;
