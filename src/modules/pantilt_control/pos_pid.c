@@ -123,7 +123,7 @@ __EXPORT float pos_pid_calculate(pos_pid_t *pid, float sp, float val, float dt)
 	pid->sp = sp;
 
 	// Calculated current error value
-	float error =  val - pid->sp;
+	float error =  pid->sp - val;
 
 	if ((pid->limit_min < error) && (error < pid->limit_max)) {
 		return 0.0f;

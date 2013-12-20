@@ -318,6 +318,9 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 				target_reached[1] = true;
 			}
 
+		} else {
+			target_reached[0] = true;
+			target_reached[1] = true;
 		}
 
 
