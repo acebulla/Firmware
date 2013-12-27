@@ -324,18 +324,18 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 		}
 
 
-		/* Correct for change of quadrotor's attitude */
-		orb_copy(ORB_ID(vehicle_attitude), attitude_sub, &attitude_s); // Assume we always get data
-
-		if(fabs(attitude_s.yawspeed) > 0.009f) {
-			current_pos[0] = current_pos[0] - (attitude_s.yawspeed / 100.0f);
-			target_reached[0] = false;
-		}
-
-		if(fabs(attitude_s.pitchspeed) > 0.005f) {
-			current_pos[1] = current_pos[1] - (attitude_s.pitchspeed / 100.0f);
-			target_reached[1] = false;
-		}
+//		/* Correct for change of quadrotor's attitude */
+//		orb_copy(ORB_ID(vehicle_attitude), attitude_sub, &attitude_s); // Assume we always get data
+//
+//		if(fabs(attitude_s.yawspeed) > 0.009f) {
+//			current_pos[0] = current_pos[0] - (attitude_s.yawspeed / 1000.0f);
+//			target_reached[0] = false;
+//		}
+//
+//		if(fabs(attitude_s.pitchspeed) > 0.005f) {
+//			current_pos[1] = current_pos[1] - (attitude_s.pitchspeed / 1000.0f);
+//			target_reached[1] = false;
+//		}
 
 		/* Check bounds */
 		for (i = 0; i < SERVOS_ATTACHED; i++) {
@@ -365,7 +365,7 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 
 
 		/* run at approximately 30 Hz */
-		usleep(10000);
+		usleep(1000);
 	}
 
 	warnx("stopped");
