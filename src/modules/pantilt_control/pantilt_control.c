@@ -74,7 +74,7 @@ static int deamon_task;				/**< Handle of deamon task / thread */
 
 static float start_pos = 1.5708f;
 static float error_band = 0.034f; /** 2° */ //0.0523f; /** 3° */
-static float max_speed = 0.075f; /** 4.3° */
+static float max_speed = (0.075f / 2.0f); /** 4.3° */
 
 __EXPORT int pantilt_control_main(int argc, char *argv[]);
 
@@ -219,7 +219,7 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 //	orb_advert_t local_pos_sp_pub = orb_advertise(ORB_ID(vehicle_local_position_setpoint), &local_pos_sp);
 	orb_advert_t servo_control_pub = orb_advertise(ORB_ID(servo12c_control), &servo_control);
 
-
+	usleep(10000000);
 
 	hrt_abstime t_prev = 0;
 
@@ -241,8 +241,12 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 	speed_pid_init(&tilt_vel_pid, params.tilt_vel_KP, params.tilt_vel_KI, params.tilt_vel_KD, -error_band, error_band, SPEED_PID_MODE_DERIVATIV_CALC, 0.02f);
 
 	bool target_reached[2];
+	bool first = true;
 
 	int loops_since_last_msg = 0;
+
+	hrt_abstime now;
+
 
 
 	while (!thread_should_exit) {
@@ -278,6 +282,11 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 
 		if (new_marker_loc) {
 
+//			if (first) {
+//				now = hrt_absolute_time();
+//				first = false;
+//			}
+
 			/* clear updated flag */
 			orb_copy(ORB_ID(marker_location), marker_location_sub, &marker_loc);
 
@@ -305,6 +314,10 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 //			printf("speed 1: %.2f \n", current_speed[1]);
 
 			loops_since_last_msg = 0;
+
+//			if (current_speed[0] == 0.0f) {
+//				printf("target reached: %llu \n", (hrt_absolute_time() - now) );
+//			}
 		}
 
 		if (loops_since_last_msg > 4) {
@@ -328,21 +341,21 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 		}
 
 		/* Correct for change of quadrotor's attitude */
-		orb_copy(ORB_ID(vehicle_attitude), attitude_sub, &attitude_s); // Assume we always get data
-
-		if(fabs(attitude_s.yawspeed) > 0.009f) {
-			current_pos[0] = current_pos[0] - (attitude_s.yawspeed / 100.0f);
-			servo_control.values[0] = current_pos[0];
-			servo_control.set_value[0] = 1;
-			target_reached[0] = false;
-		}
-
-		if(fabs(attitude_s.pitchspeed) > 0.005f) {
-			current_pos[1] = current_pos[1] - (attitude_s.pitchspeed / 100.0f);
-			servo_control.values[1] = current_pos[1];
-			servo_control.set_value[1] = 1;
-			target_reached[1] = false;
-		}
+//		orb_copy(ORB_ID(vehicle_attitude), attitude_sub, &attitude_s); // Assume we always get data
+//
+//		if(fabs(attitude_s.yawspeed) > 0.009f) {
+//			current_pos[0] = current_pos[0] - (attitude_s.yawspeed / 100.0f);
+//			servo_control.values[0] = current_pos[0];
+//			servo_control.set_value[0] = 1;
+//			target_reached[0] = false;
+//		}
+//
+//		if(fabs(attitude_s.pitchspeed) > 0.005f) {
+//			current_pos[1] = current_pos[1] - (attitude_s.pitchspeed / 100.0f);
+//			servo_control.values[1] = current_pos[1];
+//			servo_control.set_value[1] = 1;
+//			target_reached[1] = false;
+//		}
 
 		/* Check that current_pos is not set to a location, which the servo cannot reach. */
 		for (i = 0; i < SERVOS_ATTACHED; i++) {
@@ -360,13 +373,15 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 
 
 
+
+
 //		t_prev = t;
 
 
 		/* run at approximately 30 Hz */
 		// usleep(34000);
 		loops_since_last_msg++;
-		usleep(10000);
+		usleep(5000);
 	}
 
 	warnx("stopped");
