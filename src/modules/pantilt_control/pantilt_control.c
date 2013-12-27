@@ -241,11 +241,9 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 	speed_pid_init(&tilt_vel_pid, params.tilt_vel_KP, params.tilt_vel_KI, params.tilt_vel_KD, -error_band, error_band, SPEED_PID_MODE_DERIVATIV_CALC, 0.02f);
 
 	bool target_reached[2];
-	bool first = true;
 
 	int loops_since_last_msg = 0;
 
-	hrt_abstime now;
 
 
 
@@ -282,11 +280,6 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 
 		if (new_marker_loc) {
 
-//			if (first) {
-//				now = hrt_absolute_time();
-//				first = false;
-//			}
-
 			/* clear updated flag */
 			orb_copy(ORB_ID(marker_location), marker_location_sub, &marker_loc);
 
@@ -314,13 +307,9 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 //			printf("speed 1: %.2f \n", current_speed[1]);
 
 			loops_since_last_msg = 0;
-
-//			if (current_speed[0] == 0.0f) {
-//				printf("target reached: %llu \n", (hrt_absolute_time() - now) );
-//			}
 		}
 
-		if (loops_since_last_msg > 4) {
+		if (loops_since_last_msg > 8) {
 			/* No new marker location for 50 ms. Assume we lost the marker. */
 			current_speed[0] = 0.0f; current_speed[1] = 0.0f;
 		}
@@ -341,21 +330,21 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 		}
 
 		/* Correct for change of quadrotor's attitude */
-//		orb_copy(ORB_ID(vehicle_attitude), attitude_sub, &attitude_s); // Assume we always get data
-//
-//		if(fabs(attitude_s.yawspeed) > 0.009f) {
-//			current_pos[0] = current_pos[0] - (attitude_s.yawspeed / 100.0f);
-//			servo_control.values[0] = current_pos[0];
-//			servo_control.set_value[0] = 1;
-//			target_reached[0] = false;
-//		}
-//
-//		if(fabs(attitude_s.pitchspeed) > 0.005f) {
-//			current_pos[1] = current_pos[1] - (attitude_s.pitchspeed / 100.0f);
-//			servo_control.values[1] = current_pos[1];
-//			servo_control.set_value[1] = 1;
-//			target_reached[1] = false;
-//		}
+		orb_copy(ORB_ID(vehicle_attitude), attitude_sub, &attitude_s); // Assume we always get data
+
+		if(fabs(attitude_s.yawspeed) > 0.009f) {
+			current_pos[0] = current_pos[0] - (attitude_s.yawspeed / 200.0f);
+			servo_control.values[0] = current_pos[0];
+			servo_control.set_value[0] = 1;
+			target_reached[0] = false;
+		}
+
+		if(fabs(attitude_s.pitchspeed) > 0.005f) {
+			current_pos[1] = current_pos[1] - (attitude_s.pitchspeed / 200.0f);
+			servo_control.values[1] = current_pos[1];
+			servo_control.set_value[1] = 1;
+			target_reached[1] = false;
+		}
 
 		/* Check that current_pos is not set to a location, which the servo cannot reach. */
 		for (i = 0; i < SERVOS_ATTACHED; i++) {
