@@ -194,3 +194,6 @@ ORB_DEFINE(servo12c_position, struct servo_pos_values);
 
 #include "topics/marker_location.h"
 ORB_DEFINE(marker_location, struct marker_location_s);
+
+#include <drivers/drv_wiiIRsensor.h>
+ORB_DEFINE(wii_IR_sensor, struct wii_IR_report);

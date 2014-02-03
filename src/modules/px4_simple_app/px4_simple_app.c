@@ -47,6 +47,7 @@
 #include <uORB/uORB.h>
 #include <drivers/drv_range_finder_multsens.h>
 #include <drivers/drv_servo12c.h>
+#include <drivers/drv_wiiIRsensor.h>
 #include <uORB/topics/marker_location.h>
 
 
@@ -57,7 +58,7 @@ __EXPORT int px4_simple_app_main(int argc, char *argv[]);
 int px4_simple_app_main(int argc, char *argv[])
 {
 	/* subscribe to sensor_combined topic */
-	int sensor_sub_fd = orb_subscribe(ORB_ID(servo12c_control));
+	int sensor_sub_fd = orb_subscribe(ORB_ID(wii_IR_sensor));
 //	int sensor_sub_fd = orb_subscribe(ORB_ID(servo12c_position));
 	orb_set_interval(sensor_sub_fd, 35);
 
@@ -74,7 +75,7 @@ int px4_simple_app_main(int argc, char *argv[])
 	int i = 0;
 
 	/* obtained data for the first file descriptor */
-	struct servo_control_values raw;
+	struct wii_IR_report raw;
 //	struct servo_pos_values raw;
 
 	while (true) {
@@ -99,17 +100,23 @@ int px4_simple_app_main(int argc, char *argv[])
 			if (fds[0].revents & POLLIN) {
 				uint8_t j;
 				/* copy sensors raw data into local buffer */
-				orb_copy(ORB_ID(servo12c_control), sensor_sub_fd, &raw);
+				orb_copy(ORB_ID(wii_IR_sensor), sensor_sub_fd, &raw);
 //				printf("[px4_simple_app] Pan: %.4f Tilt: %.4f \n",
 //								raw.values[0],
 //								raw.values[1]);
-				printf("[px4_simple_app] Pan %d: %.2f %.2f Tilt %d: %.2f %.2f \n",
-					raw.set_value[0],
-					raw.speed[0],
-					raw.values[0],
-					raw.set_value[1],
-					raw.speed[1],
-					raw.values[1]);
+//				printf("[px4_simple_app] Pan %d: %.2f %.2f Tilt %d: %.2f %.2f \n",
+//					raw.set_value[0],
+//					raw.speed[0],
+//					raw.values[0],
+//					raw.set_value[1],
+//					raw.speed[1],
+//					raw.values[1]);
+				printf("[px4_simple_app] Ix1: %d Iy1: %d Ix2: %d Iy2: %d \n",
+								raw.Ix1,
+								raw.Iy1,
+								raw.Ix2,
+								raw.Iy2);
+
 			}
 			/* there could be more file descriptors here, in the form like:
 			 * if (fds[1..n].revents & POLLIN) {}

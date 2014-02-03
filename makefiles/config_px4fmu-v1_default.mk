@@ -40,6 +40,7 @@ MODULES		+= drivers/meas_airspeed
 MODULES		+= modules/sensors
 
 MODULES		+= drivers/servo12c
+MODULES         += drivers/wiiIRsensor
 
 #
 # System commands
