@@ -307,7 +307,7 @@ SERVO12C::probe()
 	_msg[0] = 0;
 	for (i = 1; i <= SERVOS_ATTACHED; i++)
 	{
-		_msg[i] = 10;
+		_msg[i] = 110;
 	}
 
 	//printf("sizeof(msg) = %d\n", sizeof(msg));

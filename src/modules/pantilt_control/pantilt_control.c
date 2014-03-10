@@ -74,7 +74,7 @@ static int deamon_task;				/**< Handle of deamon task / thread */
 
 static float start_pos = 1.5808f;
 static float error_band = 0.035f; /** 2° */
-static float max_speed = 0.23271f; /** RAD in 30 ms*/
+static float max_speed = 0.04513f; /** RAD in 30 ms = 2.6 DEG*/
 
 __EXPORT int pantilt_control_main(int argc, char *argv[]);
 

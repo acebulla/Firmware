@@ -81,13 +81,13 @@ typedef float	servo_position_f;
 /** Measured characteristics of the individual servo
  * Pan = Servo 0; Tilt = Servo 1
  */
-const servo_position_f SERVO_MAX_ABS[SERVOS_ATTACHED] = {224, 195};
-const servo_position_f SERVO_MAX_DEG[SERVOS_ATTACHED] = {158, 138};
-const servo_position_f SERVO_MAX_RAD[SERVOS_ATTACHED] = {2.76f, 2.4f};
+const servo_position_f SERVO_MAX_ABS[SERVOS_ATTACHED] = {220, 180};
+const servo_position_f SERVO_MAX_DEG[SERVOS_ATTACHED] = {177, 141};
+const servo_position_f SERVO_MAX_RAD[SERVOS_ATTACHED] = {3.09f, 2.47f};
 
-const servo_position_f SERVO_MIN_ABS[SERVOS_ATTACHED] = {30, 85};
-const servo_position_f SERVO_MIN_DEG[SERVOS_ATTACHED] = {21, 60};
-const servo_position_f SERVO_MIN_RAD[SERVOS_ATTACHED] = {0.37f, 1.05f};
+const servo_position_f SERVO_MIN_ABS[SERVOS_ATTACHED] = {20, 20};
+const servo_position_f SERVO_MIN_DEG[SERVOS_ATTACHED] = {4, 4};
+const servo_position_f SERVO_MIN_RAD[SERVOS_ATTACHED] = {0.08f, 0.08f};
 
 /** Two points measured to calibrate the servos.
  *  Used to convert from DEG or RAD to ABS values.
