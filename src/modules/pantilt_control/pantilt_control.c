@@ -74,7 +74,7 @@ static int deamon_task;				/**< Handle of deamon task / thread */
 
 static float start_pos = 1.5808f;
 static float error_band = 0.035f; /** 2° */
-static float max_speed = 0.04513f; /** RAD in 30 ms = 2.6 DEG*/
+static float max_speed; //513f; /** RAD in 30 ms = 2.6 DEG*/
 
 __EXPORT int pantilt_control_main(int argc, char *argv[]);
 
@@ -218,7 +218,7 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 
 	float error =  0.0f;
 
-
+	max_speed = params.pan_pos_KD;
 
 	while (!thread_should_exit) {
 
@@ -231,6 +231,7 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 			orb_copy(ORB_ID(parameter_update), param_sub, &ps);
 			/* update params */
 			parameters_update(&params_h, &params);
+			max_speed = params.pan_pos_KD;
 		}
 
 
@@ -261,6 +262,8 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 				}
 
 				target_reached[0] = false;
+			}  else {
+				target_reached[0] = true;
 			}
 
 
@@ -280,6 +283,8 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 				}
 
 				target_reached[1] = false;
+			} else {
+				target_reached[1] = true;
 			}
 
 		} else {
@@ -291,13 +296,13 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 		/* Correct for change of quadrotor's attitude */
 //		orb_copy(ORB_ID(vehicle_attitude), attitude_sub, &attitude_s); // Assume we always get data
 //
-//		if( ((attitude_s.yawspeed < 0) ? -attitude_s.yawspeed : attitude_s.yawspeed) > 0.009f) {
-//			current_pos[0] = current_pos[0] - (attitude_s.yawspeed / 1000.0f);
+//		if( ((attitude_s.yawspeed < 0) ? -attitude_s.yawspeed : attitude_s.yawspeed) > 0.010f) {
+//			current_pos[0] = current_pos[0] - (attitude_s.yawspeed / 300.0f);
 //			target_reached[0] = false;
 //		}
 //
-//		if ( ((attitude_s.pitchspeed < 0) ? -attitude_s.pitchspeed : attitude_s.pitchspeed) > 0.005f) {
-//			current_pos[1] = current_pos[1] - (attitude_s.pitchspeed / 1000.0f);
+//		if ( ((attitude_s.pitchspeed < 0) ? -attitude_s.pitchspeed : attitude_s.pitchspeed) > 0.008f) {
+//			current_pos[1] = current_pos[1] - (attitude_s.pitchspeed / 300.0f);
 //			target_reached[1] = false;
 //		}
 
@@ -326,6 +331,11 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 
 		/* Synchronize using camera messages */
 		usleep(1000);
+		for (i = 0; i < SERVOS_ATTACHED; i++) {
+			target_reached[i] = true;
+			servo_control.set_value[i] = 0;
+		}
+
 	}
 
 	warnx("stopped");

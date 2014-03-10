@@ -674,6 +674,8 @@ SERVO12C::task_cycle()
 	uint8_t i;
 	struct servo_param_handles param_handles;
 
+	bool new_val;
+
 	/* get parameters of the servo calibration */
 	parameters_init(param_handles);
 	parameters_update(param_handles, _calibration_values);
@@ -740,8 +742,13 @@ SERVO12C::task_cycle()
 			for (i = 0; i < SERVOS_ATTACHED; i++) {
 
 //				_target[i] = _controls.set_value[i] ? convert(_controls.values[i], i) : _current_values[i];
+				if (_controls.set_value[i]) {
 
-				_val[i] = _controls.set_value[i] ? convert(_controls.values[i], i) : _current_values[i];
+					_val[i] = convert(_controls.values[i], i);
+					new_val = true;
+				} else {
+					_val[i] = _current_values[i];
+				}
 
 //				calculate_speed(_controls.speed[i], i);
 			}
@@ -750,8 +757,10 @@ SERVO12C::task_cycle()
 //			for (i = 0; i < 5; i++) {
 //				log("speed %d: %d \n", i, _speed[1][i]);
 //			}
-
-			set_servo_values();
+			if (new_val) {
+				set_servo_values();
+			}
+			new_val = false;
 
 		}
 //
