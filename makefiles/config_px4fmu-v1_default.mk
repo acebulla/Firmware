@@ -71,6 +71,7 @@ MODULES		+= modules/mavlink
 MODULES		+= modules/gpio_led
 
 MODULES		+= modules/mavlink_odroid
+MODULES         += modules/servo_calibration
 
 #
 # Estimation modules (EKF/ SO3 / other filters)
