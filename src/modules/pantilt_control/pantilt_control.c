@@ -72,7 +72,7 @@ static bool thread_should_exit = false;		/**< Deamon exit flag */
 static bool thread_running = false;		/**< Deamon status flag */
 static int deamon_task;				/**< Handle of deamon task / thread */
 
-static float start_pos = 1.5808f;
+static float start_pos = 0.0f; //1.5808f;
 static float error_band = 0.035f; /** 2° */
 static float max_speed; //513f; /** RAD in 30 ms = 2.6 DEG*/
 
@@ -312,10 +312,10 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 				servo_control.set_value[i] = 0;
 				continue;
 			}
-
-			if (current_pos[i] > SERVO_MAX_RAD[i]) {
+			/* This is correct SERVO_MAX_RAD is negative! */
+			if (current_pos[i] < SERVO_MAX_RAD[i]) {
 				current_pos[i] = SERVO_MAX_RAD[i];
-			} else if (current_pos[i] < SERVO_MIN_RAD[i]) {
+			} else if (current_pos[i] > SERVO_MIN_RAD[i]) {
 				current_pos[i] = SERVO_MIN_RAD[i];
 			}
 

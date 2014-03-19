@@ -81,44 +81,32 @@ typedef float	servo_position_f;
 /** Measured characteristics of the individual servo
  * Pan = Servo 0; Tilt = Servo 1
  */
-const servo_position_f SERVO_MAX_ABS[SERVOS_ATTACHED] = {220, 180};
+const servo_position_f SERVO_MAX_ABS[SERVOS_ATTACHED] = {220, 170};
 const servo_position_f SERVO_MAX_DEG[SERVOS_ATTACHED] = {177, 141};
-const servo_position_f SERVO_MAX_RAD[SERVOS_ATTACHED] = {3.09f, 2.47f};
+const servo_position_f SERVO_MAX_RAD[SERVOS_ATTACHED] = {-1.64f, -0.74f};
 
 const servo_position_f SERVO_MIN_ABS[SERVOS_ATTACHED] = {20, 20};
 const servo_position_f SERVO_MIN_DEG[SERVOS_ATTACHED] = {4, 4};
-const servo_position_f SERVO_MIN_RAD[SERVOS_ATTACHED] = {0.08f, 0.08f};
+const servo_position_f SERVO_MIN_RAD[SERVOS_ATTACHED] = {1.53f, 1.7f};
 
 /** Two points measured to calibrate the servos.
  *  Used to convert from DEG or RAD to ABS values.
  */
 
 struct servo_calibration_values {
-	servo_position_f SERVO_P1_ABS[SERVOS_ATTACHED];
-	servo_position_f SERVO_P1_DEG[SERVOS_ATTACHED];
-	servo_position_f SERVO_P1_RAD[SERVOS_ATTACHED];
+	servo_position_f pan_slope;
+	servo_position_f pan_yintercept;
 
-	servo_position_f SERVO_P2_ABS[SERVOS_ATTACHED];
-	servo_position_f SERVO_P2_DEG[SERVOS_ATTACHED];
-	servo_position_f SERVO_P2_RAD[SERVOS_ATTACHED];
+	servo_position_f tilt_slope;
+	servo_position_f tilt_yintercept;
 };
 
 struct servo_param_handles {
-	param_t pan_p1_ABS;
-	param_t pan_p1_DEG;
-	param_t pan_p1_RAD;
+	param_t pan_slope;
+	param_t pan_yintercept;
 
-	param_t pan_p2_ABS;
-	param_t pan_p2_DEG;
-	param_t pan_p2_RAD;
-
-	param_t tilt_p1_ABS;
-	param_t tilt_p1_DEG;
-	param_t tilt_p1_RAD;
-
-	param_t tilt_p2_ABS;
-	param_t tilt_p2_DEG;
-	param_t tilt_p2_RAD;
+	param_t tilt_slope;
+	param_t tilt_yintercept;
 };
 
 /**

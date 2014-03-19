@@ -52,6 +52,8 @@
 #include <uORB/uORB.h>
 #include <uORB/topics/marker_location.h>
 
+#include <systemlib/param/param.h>
+
 #include <drivers/drv_servo12c.h>
 
 
@@ -76,7 +78,7 @@ float average_pos(uint8_t servo);
 /**
  * Finds a and b, such that y = a*x + b, where x in RAD and y in ABS
  */
-void lin_regression(uint8_t servo, uint8_t pos_abs[], float pos_angle[]);
+void lin_regression(uint8_t pos_abs[], float pos_angle[], float *a, float *b);
 
 /* structures */
 struct marker_location_s marker_loc;
@@ -130,13 +132,30 @@ int servo_calibration_main(int argc, char *argv[])
 	uint8_t pos_abs[nPoints];
 	float pos_angle[nPoints];
 
+	param_t param_slope;
+	param_t param_yintercept;
+
+	float a = 0.0f, b = 0.0f;
+
 	for (i = 0; i < 2; i++) {
 		send_pos(0, start_pos);
 		send_pos(1, start_pos);
 		usleep(1000000);
 		get_measurements(i, pos_abs, pos_angle);
-		lin_regression(i , pos_abs, pos_angle);
+		lin_regression(pos_abs, pos_angle, &a, &b);
+		printf("y = %.3f*x + %.3f \n", a, b);
+		if (i == 0) {
+			param_slope = param_find("SERVO_PAN_SLOPE");
+			param_yintercept = param_find("SERVO_PAN_YINT");
+		} else {
+			param_slope = param_find("SERVO_TILT_SLOPE");
+			param_yintercept = param_find("SERVO_TILT_YINT");
+		}
+		param_set(param_slope, &a);
+		param_set(param_yintercept, &b);
 	}
+
+	param_save_default();
 
 
 	return OK;
@@ -231,11 +250,11 @@ float average_pos(uint8_t servo)
 	return angle / 5.0f;
 }
 
-void lin_regression(uint8_t servo, uint8_t pos_abs[], float pos_angle[])
+void lin_regression(uint8_t pos_abs[], float pos_angle[], float *a, float *b)
 {
 	/* Finds a and b, such that y = a*x + b, where x in RAD and y in ABS.
 	 * 	x = pos_angle; y = pos_abs */
-	float x_avg = 0.0f, y_avg = 0.0f, a = 0.0f, a1 = 0.0f, a2 = 0.0f, b = 0.0f;
+	float x_avg = 0.0f, y_avg = 0.0f, a1 = 0.0f, a2 = 0.0f;
 	uint8_t i;
 	for (i = 0; i < nPoints; i++)
 	{
@@ -250,8 +269,7 @@ void lin_regression(uint8_t servo, uint8_t pos_abs[], float pos_angle[])
 		a1 += (pos_angle[i] - x_avg)*(pos_abs[i] - y_avg);
 		a2 += (pos_angle[i] - x_avg)*(pos_angle[i] - x_avg);
 	}
-	a = a1 / a2;
-	b = y_avg - a*x_avg;
-	printf("y = %.3f*x + %.3f \n", a, b);
+	*a = a1 / a2;
+	*b = y_avg - (*a)*x_avg;
 
 }
