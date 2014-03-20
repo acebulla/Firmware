@@ -261,10 +261,15 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 					current_pos[0] = current_pos[0] + tmp;
 				}
 
+
+
 				target_reached[0] = false;
 			}  else {
 				target_reached[0] = true;
+				servo_control.set_value[0] = 0;
 			}
+
+			printf("%llu error: %.5f current_pos_pan: %.5f \n", hrt_absolute_time(), error, current_pos[0]);
 
 
 			// Calculated current error value
@@ -285,6 +290,7 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 				target_reached[1] = false;
 			} else {
 				target_reached[1] = true;
+				servo_control.set_value[1] = 0;
 			}
 
 		} else {
