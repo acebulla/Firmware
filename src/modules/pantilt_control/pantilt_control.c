@@ -1,7 +1,7 @@
 /****************************************************************************
  *
  *   Copyright (C) 2013 PX4 Development Team. All rights reserved.
- *   Author: Anton Babushkin <anton.babushkin@me.com>
+ *   Author: Alexander Cebulla <acebulla@student.ethz.ch>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -63,9 +63,6 @@
 #include <drivers/drv_servo12c.h>
 
 #include "pantilt_params.h"
-#include "pos_pid.h"
-
-#include "speed_pid.h"
 
 
 static bool thread_should_exit = false;		/**< Deamon exit flag */
@@ -74,7 +71,6 @@ static int deamon_task;				/**< Handle of deamon task / thread */
 
 static float start_pos = 0.0f; //1.5808f;
 static float error_band = 0.035f; /** 2° */
-static float max_speed; //513f; /** RAD in 30 ms = 2.6 DEG*/
 
 __EXPORT int pantilt_control_main(int argc, char *argv[]);
 
@@ -210,15 +206,17 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 
 
 	servo_position_f current_pos[2] = {start_pos, start_pos};
-	servo_position_f target[2] = {start_pos, start_pos};
 	servo_position_f tmp = 0.0f;
 
+	// For testing
+	servo_position_f old_current_pos;
+	servo_position_f new_current_pos;
+	float error_recorded;
 
 	bool target_reached[2] = {true, true};
 
 	float error =  0.0f;
 
-	max_speed = params.pan_pos_KD;
 
 	while (!thread_should_exit) {
 
@@ -231,7 +229,6 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 			orb_copy(ORB_ID(parameter_update), param_sub, &ps);
 			/* update params */
 			parameters_update(&params_h, &params);
-			max_speed = params.pan_pos_KD;
 		}
 
 
@@ -243,25 +240,29 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 			/* clear updated flag */
 			orb_copy(ORB_ID(marker_location), marker_location_sub, &marker_loc);
 
-
+			new_marker_loc = false;
 
 
 			// Calculated current error value
 			error =  0.0f - marker_loc.pan;
 
 			if ( !((-error_band < error) && (error < error_band)) ) {
+				error_recorded = error;
+
 				/* calculate position */
 				tmp = params.pan_pos_KP*error;
 
+				old_current_pos = current_pos[0];
+
 				/* Limit it to the maximum distance, which the servo can travle in 30 ms */
-				if (((tmp < 0) ? -tmp : tmp) > max_speed) {
+				if (((tmp < 0) ? -tmp : tmp) > params.pan_max_speed) {
 					// (target[0] > 0) - (target[0] < 0) gives the sign.
-					current_pos[0] = current_pos[0] + (float)( (tmp > 0) - (tmp < 0) ) * max_speed;
+					current_pos[0] = current_pos[0] + (float)( (tmp > 0) - (tmp < 0) ) * params.pan_max_speed;
 				} else {
 					current_pos[0] = current_pos[0] + tmp;
 				}
 
-
+				new_current_pos = current_pos[0];
 
 				target_reached[0] = false;
 			}  else {
@@ -269,7 +270,7 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 				servo_control.set_value[0] = 0;
 			}
 
-			printf("%llu error: %.5f current_pos_pan: %.5f \n", hrt_absolute_time(), error, current_pos[0]);
+
 
 
 			// Calculated current error value
@@ -280,9 +281,9 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 				tmp = params.tilt_pos_KP*error;
 
 				/* Limit it to the maximum distance, which the servo can travle in 30 ms */
-				if (((tmp < 0) ? -tmp : tmp) > max_speed) {
+				if (((tmp < 0) ? -tmp : tmp) > params.tilt_max_speed) {
 					// (target[0] > 0) - (target[0] < 0) gives the sign.
-					current_pos[1] = current_pos[1] + (float)( (tmp > 0) - (tmp < 0) ) * max_speed;
+					current_pos[1] = current_pos[1] + (float)( (tmp > 0) - (tmp < 0) ) * params.tilt_max_speed;
 				} else {
 					current_pos[1] = current_pos[1] + tmp;
 				}
@@ -329,8 +330,13 @@ static int pantilt_control_thread_main(int argc, char *argv[])
 			servo_control.set_value[i] = 1;
 		}
 
+		// For testing
+		// Only interested in pan xor tilt, not both:
+		// target_reached[1] = true; servo_control.set_value[1] = 0;
+
 
 		if (!(target_reached[0] && target_reached[1]) ) {
+			printf("Pan Servo: Time: %llu old position: %.1f new position: %.1f error: %.1f \n", hrt_absolute_time(), old_current_pos, new_current_pos, error_recorded);
 			orb_publish(ORB_ID(servo12c_control), servo_control_pub, &servo_control);
 		}
 
