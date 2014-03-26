@@ -48,12 +48,8 @@ struct pantilt_params {
 	float tilt_pos_KI;
 	float tilt_pos_KD;
 
-	float pan_vel_KP;
-	float pan_vel_KI;
-	float pan_vel_KD;
-	float tilt_vel_KP;
-	float tilt_vel_KI;
-	float tilt_vel_KD;
+	float pan_max_speed;
+	float tilt_max_speed;
 };
 
 struct pantilt_param_handles {
@@ -64,12 +60,8 @@ struct pantilt_param_handles {
 	param_t tilt_pos_KI;
 	param_t tilt_pos_KD;
 
-	param_t pan_vel_KP;
-	param_t pan_vel_KI;
-	param_t pan_vel_KD;
-	param_t tilt_vel_KP;
-	param_t tilt_vel_KI;
-	param_t tilt_vel_KD;
+	param_t pan_max_speed;
+	param_t tilt_max_speed;
 };
 
 /**
